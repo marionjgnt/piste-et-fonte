@@ -246,6 +246,17 @@ details.card[open] > summary::after{content:" ▾"}
 .coach{margin:-2px 0 12px 42px;padding:10px 12px;border-radius:14px 14px 14px 4px;background:var(--lane-soft);font-size:14px;display:flex;flex-direction:column;gap:6px}
 .coach b{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--lane)}
 .coach .btn{align-self:flex-start}
+.me{width:40px;height:40px;border-radius:50%;border:0;background:var(--hero);color:var(--ink);font-family:var(--display);font-size:20px;font-weight:700;display:grid;place-items:center;box-shadow:var(--shadow)}
+.hello{font-family:var(--display);font-size:20px;font-weight:600;color:var(--accent);margin-bottom:2px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two .field input{background:var(--surface)}
+.pick-hint{font-size:13px;color:var(--ink-2);margin-top:8px}
+.choice .badge{align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-fill);color:var(--accent-ink);padding:2px 8px;border-radius:999px;margin-top:4px}
+.recap{display:flex;flex-direction:column}
+.recap div{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:10px 16px;border-top:1px solid var(--line);font-size:15px}
+.recap div:first-child{border-top:0}
+.recap span:first-child{color:var(--ink-2);font-size:13px;text-transform:uppercase;letter-spacing:.06em;padding-top:2px}
+.avatar-big{width:72px;height:72px;border-radius:50%;background:var(--hero);display:grid;place-items:center;font-family:var(--display);font-size:36px;font-weight:700;box-shadow:var(--shadow)}
 .adv-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
 .adv-row:first-child{border-top:0}
 .adv-row .d{grid-column:1/-1;font-size:13px;color:var(--ink-2)}
@@ -378,7 +389,7 @@ details.card[open] > summary::after{content:" ▾"}
       <img src="icon-192.png" alt="" width="30" height="30" style="border-radius:8px;display:block">
       Mova
     </div>
-    <div class="status" id="status"><i></i><span>Sur ce téléphone</span></div>
+    <button type="button" class="me" id="me" data-act="go" data-tab="profil" aria-label="Mon profil"><span id="me-initial">?</span></button>
   </div>
   <main id="view"></main>
 </div>
@@ -449,7 +460,68 @@ const GOALS = {
   force:    {label:'Gagner en force', sub:'Charges lourdes', method:'force'},
   seche:    {label:'Perdre du gras', sub:'Sèche, dépense', method:'meta'},
   endurance:{label:'Endurance et cardio', sub:'Tenir plus longtemps', method:'endu'},
-  forme:    {label:'Être en forme', sub:'Santé, énergie', method:'hyper'}
+  forme:    {label:'Être en forme', sub:'Santé, énergie', method:'hyper'},
+  tonifier: {label:'Tonifier, dessiner', sub:'Silhouette ferme', method:'hyper'},
+  mobilite: {label:'Mobilité, souplesse', sub:'Bouger mieux', method:'endu'},
+  sport:    {label:'Préparer un sport', sub:'Explosivité, gainage', method:'puiss'}
+};
+const ZONES = {fessiers:'Fessiers', jambes:'Cuisses (quadri, ischios)', abdos:'Abdos, sangle', dos:'Dos', pecs:'Pectoraux', epaules:'Épaules', bras:'Bras', global:'Tout le corps, équilibré'};
+const EQUIP2 = {salle:['Salle de sport','Machines, barres, poulies'], halteres:['Haltères','À la maison ou en salle'], kettlebell:['Kettlebell',''], elastiques:['Élastiques',''], barre:['Barre de traction',''], pdc:['Poids du corps','Sans matériel']};
+const LIMITS = {genoux:'Genoux', dos:'Dos, lombaires', epaules:'Épaules', poignets:'Poignets', aucune:'Aucune'};
+const SEXES = {femme:'Femme', homme:'Homme', autre:'Autre'};
+const ALLEQ = ['salle','halteres','kettlebell','elastiques','barre','pdc'];
+// [groupe, zones, matériel, à éviter si douleur, polyarticulaire]
+const EXDB = {
+  'Squat barre':['bas',['jambes','fessiers'],['salle'],['genoux','dos'],1],
+  'Presse à cuisses':['bas',['jambes','fessiers'],['salle'],[],1],
+  'Machine hack squat':['bas',['jambes','fessiers'],['salle'],['genoux'],1],
+  'Goblet squat':['bas',['jambes','fessiers'],['halteres','kettlebell'],['genoux'],1],
+  'Squat':['bas',['jambes','fessiers'],ALLEQ,['genoux'],1],
+  'Soulevé de terre roumain':['bas',['fessiers','jambes'],['salle'],['dos'],1],
+  'Soulevé de terre roumain haltères':['bas',['fessiers','jambes'],['halteres','kettlebell'],['dos'],1],
+  'Hip thrust':['bas',['fessiers'],['salle'],[],1],
+  'Hip thrust haltère':['bas',['fessiers'],['halteres','kettlebell'],[],1],
+  'Pont fessier':['bas',['fessiers'],ALLEQ,[],0],
+  'Fentes bulgares':['bas',['fessiers','jambes'],['salle','halteres','kettlebell','pdc'],['genoux'],1],
+  'Fentes arrière':['bas',['fessiers','jambes'],ALLEQ,['genoux'],1],
+  'Step up':['bas',['fessiers','jambes'],['salle','halteres','pdc'],[],1],
+  'Leg curl assis':['bas',['jambes'],['salle'],[],0],
+  'Leg extension':['bas',['jambes'],['salle'],['genoux'],0],
+  'Abduction machine':['bas',['fessiers'],['salle'],[],0],
+  'Kickback à la poulie':['bas',['fessiers'],['salle'],[],0],
+  'Abduction élastique':['bas',['fessiers'],['elastiques'],[],0],
+  'Kettlebell swing':['bas',['fessiers','jambes'],['kettlebell'],['dos'],1],
+  'Mollets debout':['bas',['jambes'],['salle','halteres','pdc'],[],0],
+  'Développé couché':['push',['pecs','bras'],['salle'],['epaules'],1],
+  'Développé couché haltères':['push',['pecs','bras'],['halteres','salle'],[],1],
+  'Développé incliné haltères':['push',['pecs','epaules'],['halteres','salle'],[],1],
+  'Pompes':['push',['pecs','bras'],ALLEQ,['poignets'],1],
+  'Développé militaire':['push',['epaules','bras'],['salle'],['epaules','dos'],1],
+  'Développé épaules haltères':['push',['epaules','bras'],['halteres','salle'],['epaules'],1],
+  'Élévations latérales':['push',['epaules'],['halteres','salle','elastiques'],[],0],
+  'Pec deck':['push',['pecs'],['salle'],[],0],
+  'Dips':['push',['pecs','bras'],['salle','barre'],['epaules','poignets'],1],
+  'Extension triceps poulie':['push',['bras'],['salle'],[],0],
+  'Extension triceps haltère':['push',['bras'],['halteres'],[],0],
+  'Tractions':['pull',['dos','bras'],['barre','salle'],['epaules'],1],
+  'Tirage vertical':['pull',['dos','bras'],['salle'],[],1],
+  'Rowing haltère':['pull',['dos','bras'],['halteres','salle','kettlebell'],[],1],
+  'Rowing barre':['pull',['dos'],['salle'],['dos'],1],
+  'Tirage horizontal':['pull',['dos'],['salle'],[],1],
+  'Rowing élastique':['pull',['dos'],['elastiques'],[],1],
+  'Rowing inversé':['pull',['dos','bras'],['barre'],[],1],
+  'Face pull':['pull',['epaules','dos'],['salle','elastiques'],[],0],
+  'Oiseau haltères':['pull',['epaules','dos'],['halteres'],[],0],
+  'Curl biceps':['pull',['bras'],['salle'],[],0],
+  'Curl haltères':['pull',['bras'],['halteres','kettlebell'],[],0],
+  'Curl élastique':['pull',['bras'],['elastiques'],[],0],
+  'Superman':['pull',['dos'],ALLEQ,[],0],
+  'Gainage planche':['core',['abdos'],ALLEQ,['poignets'],0],
+  'Gainage latéral':['core',['abdos'],ALLEQ,[],0],
+  'Dead bug':['core',['abdos'],ALLEQ,[],0],
+  'Relevés de jambes':['core',['abdos'],['pdc','barre','salle'],['dos'],0],
+  'Crunch à la poulie':['core',['abdos'],['salle'],[],0],
+  'Russian twists':['core',['abdos'],ALLEQ,['dos'],0]
 };
 const LEVELS = {
   debutant:{label:'Débutant', sub:'Moins de 6 mois'},
@@ -497,17 +569,17 @@ const POOL = {
        halteres:['Rowing haltère','Pull-over haltère','Oiseau haltères','Shrugs haltères','Curl marteau'],
        pdc:['Tractions','Rowing inversé','Superman','Tractions australiennes','Curl serviette']}
 };
-const TIMED = new Set(['Gainage planche','Gainage latéral','Chaise murale','Superman']);
+const TIMED = new Set(['Gainage planche','Gainage latéral','Chaise murale','Superman','Dead bug']);
 const CATALOG = {
-  'Fessiers':['Hip thrust','Hip thrust machine','Pont fessier','Pont fessier unilatéral','Kickback à la poulie','Abduction machine','Fentes bulgares','Step up','Step up banc poulie','Frog pump'],
+  'Fessiers':['Hip thrust','Hip thrust machine','Hip thrust haltère','Pont fessier','Pont fessier unilatéral','Kickback à la poulie','Abduction machine','Abduction élastique','Fentes bulgares','Step up','Step up banc poulie','Frog pump'],
   'Quadriceps':['Squat barre','Goblet squat','Front squat','Machine hack squat','Presse à cuisses','Leg extension','Fentes avant','Fentes arrière','Fentes marchées','Squat bulgare','Sissy squat','Chaise murale'],
   'Ischios et lombaires':['Soulevé de terre roumain','Soulevé de terre','Leg curl assis','Leg curl allongé','Good morning','Nordic curl','Extension lombaire'],
   'Mollets et adducteurs':['Mollets debout','Mollets assis','Mollets à la presse','Adduction machine','Squat sumo'],
   'Pectoraux':['Développé couché','Développé couché haltères','Développé incliné','Développé incliné haltères','Écarté haltères','Écarté poulie','Pec deck','Pompes','Dips'],
-  'Dos':['Tractions','Tirage vertical','Tirage horizontal','Rowing barre','Rowing haltère','Pull-over poulie','Face pull','Rowing inversé'],
+  'Dos':['Tractions','Tirage vertical','Tirage horizontal','Rowing barre','Rowing haltère','Rowing élastique','Superman','Pull-over poulie','Face pull','Rowing inversé'],
   'Épaules':['Développé militaire','Développé épaules haltères','Élévations latérales','Élévations frontales','Oiseau haltères','Shrugs'],
-  'Bras':['Curl biceps','Curl haltères','Curl marteau','Curl pupitre','Extension triceps poulie','Extension triceps haltère','Barre au front','Dips sur banc'],
-  'Abdos et gainage':['Gainage planche','Gainage latéral','Crunchs','Relevés de jambes','Russian twists','Roue abdominale','Crunch à la poulie'],
+  'Bras':['Curl biceps','Curl haltères','Curl élastique','Curl marteau','Curl pupitre','Extension triceps poulie','Extension triceps haltère','Barre au front','Dips sur banc'],
+  'Abdos et gainage':['Gainage planche','Gainage latéral','Dead bug','Crunchs','Relevés de jambes','Russian twists','Roue abdominale','Crunch à la poulie'],
   'Full body et cardio':['Burpees','Kettlebell swing','Thrusters','Box jumps','Mountain climbers','Corde à sauter','Wall balls']
 };
 const COMMON_EX = [...new Set([...Object.values(CATALOG).flat(), ...Object.values(POOL).flatMap(p => Object.values(p).flat())])];
@@ -531,7 +603,7 @@ let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
-if(!['semaine','programme','seance','chrono','archive','progres'].includes(tab)) tab = 'semaine';
+if(!['semaine','programme','seance','chrono','archive','progres','profil'].includes(tab)) tab = 'semaine';
 let chronoMode = LS.get('pf.chrono', 'repos');
 const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null, archPat:'all'};
 let group = [];
@@ -561,7 +633,7 @@ const shownSessions = () => journal.sessions.length ? {sessions:journal.sessions
 
 /* ================= Sauvegarde ================= */
 function setStatus(cloud){
-  const el = $('#status');
+  const el = $('#status'); if(!el) return;
   el.classList.toggle('cloud', cloud);
   el.querySelector('span').textContent = cloud ? 'Enregistré dans ton compte' : 'Sur cet appareil';
 }
@@ -616,7 +688,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.9';
+const APP_VERSION = '1.1.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -981,10 +1053,10 @@ function renderTabs(){
     if(dot && !(b.dataset.tab === 'seance' && draft)) dot.remove();
   });
 }
-function render(){ renderTabs(); renderView(); updatePill(); }
+function render(){ renderTabs(); renderView(); updatePill(); const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (journal.profile?.prenom || '?').trim().charAt(0).toUpperCase() || '?'; }
 function renderView(){
   const v = $('#view');
-  v.innerHTML = ({semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewArchive, progres:viewProgres}[tab] || viewSemaine)();
+  v.innerHTML = ({semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewArchive, profil:viewProfil, progres:viewProgres}[tab] || viewSemaine)();
   if(tab === 'seance' && draft?.kind === 'cardio') updatePace();
   if(tab === 'progres' || tab === 'semaine') renderGroup();
   updateDials();
@@ -992,85 +1064,263 @@ function renderView(){
 function go(t){ tab = t; LS.set('pf.tab', tab); ui.msg = ''; ui.confirmDel = null; ui.confirmReset = false; render(); window.scrollTo(0,0); }
 
 /* ---------- Test de départ ---------- */
-function newTest(){
-  const p = journal.profile;
-  return {step:0, a: p ? JSON.parse(JSON.stringify(p)) : {goal:'', level:'', weekly:{bas:0,haut:0,full:0,push:0,pull:0,cardio:0}, cardioTypes:[], duration:60, equipment:'salle', mode:'', notes:''}};
+function newTest(startAt){
+  const p = journal.profile || {};
+  const a = Object.assign({prenom:'', sexe:'', age:'', taille:'', poids:'', goals:[], zones:[], level:'', days:3, cardioN:1, duration:60, equip:[], cardioTypes:[], limits:[], notes:'', weekly:{bas:0,haut:0,full:0,push:0,pull:0,cardio:0}}, JSON.parse(JSON.stringify(p)));
+  if(!a.goals?.length && a.goal) a.goals = [a.goal];
+  if(!a.equip?.length && a.equipment) a.equip = [a.equipment];
+  if(!a.weekly) a.weekly = {bas:0,haut:0,full:0,push:0,pull:0,cardio:0};
+  const t = {flow:null, i:0, a};
+  if(startAt){ t.flow = startAt; t.i = 2; }
+  return t;
+}
+function testSteps(t){
+  const create = ['toi','objectifs','zones','niveau','dispo','materiel', ...(t.a.cardioN > 0 ? ['cardio'] : []), 'limites', 'recap'];
+  return ['prenom', 'choix', ...(t.flow === 'perso' ? ['semaine'] : t.flow === 'create' ? create : [])];
 }
 function testValid(t){
-  const a = t.a;
-  return [!!a.goal, !!a.level, Object.values(a.weekly).some(n => n > 0), !!a.duration && !!a.equipment, !!a.mode][t.step];
+  const a = t.a, st = testSteps(t)[t.i];
+  return ({
+    prenom: !!String(a.prenom).trim(),
+    choix: !!t.flow,
+    semaine: Object.values(a.weekly).some(n => n > 0),
+    toi: !!a.sexe && +a.age >= 12 && +a.age <= 100,
+    objectifs: a.goals.length > 0,
+    zones: a.zones.length > 0,
+    niveau: !!a.level,
+    dispo: a.days >= 1 && !!a.duration,
+    materiel: a.equip.length > 0,
+    cardio: a.cardioTypes.length > 0,
+    limites: true, recap: true
+  })[st];
 }
 function viewTest(){
-  const t = ui.test, a = t.a, N = 5;
-  const bar = `<div class="steps">${Array.from({length:N}, (_,i) => `<span class="${i <= t.step ? 'on' : ''}"></span>`).join('')}</div>`;
+  const t = ui.test, a = t.a, steps = testSteps(t), st = steps[t.i];
+  const total = t.flow === 'create' ? steps.length : t.flow === 'perso' ? 3 : 4;
+  const bar = `<div class="steps">${Array.from({length:total}, (_,i) => `<span class="${i <= t.i ? 'on' : ''}"></span>`).join('')}</div>`;
+  const choice = (k, v, title, sub, extra = '') => `<button type="button" class="choice" data-act="t-set" data-k="${k}" data-v="${v}" aria-pressed="${a[k] === v}"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}${extra}</button>`;
+  const multi = (k, v, title, sub) => { const on = a[k].includes(v), first = k === 'goals' && a[k][0] === v; return `<button type="button" class="choice" data-act="t-multi" data-k="${k}" data-v="${v}" aria-pressed="${on}"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}${first && a.goals.length > 1 ? '<span class="badge">Principal</span>' : ''}</button>`; };
+  const pill = (k, v, label, num) => `<button type="button" class="pill" data-act="t-set" data-k="${k}" data-v="${v}" ${num ? 'data-num="1"' : ''} aria-pressed="${a[k] === (num ? +v : v)}">${label}</button>`;
   let body = '';
-  if(t.step === 0){
-    body = `<h1>Ton objectif</h1><p class="lead">Il fixe la méthode : répétitions, charges et temps de repos.</p>
-    <div class="choices" style="margin-top:16px">${Object.entries(GOALS).map(([k,g]) => `<button type="button" class="choice" data-act="t-set" data-k="goal" data-v="${k}" aria-pressed="${a.goal===k}"><b>${g.label}</b><span>${g.sub} · méthode ${METHODS[g.method].label.toLowerCase()}</span></button>`).join('')}</div>`;
-  }else if(t.step === 1){
-    body = `<h1>Ton niveau</h1><p class="lead">Depuis combien de temps tu t’entraînes régulièrement ?</p>
-    <div class="choices" style="margin-top:16px">${Object.entries(LEVELS).map(([k,l]) => `<button type="button" class="choice" data-act="t-set" data-k="level" data-v="${k}" aria-pressed="${a.level===k}"><b>${l.label}</b><span>${l.sub}</span></button>`).join('')}</div>`;
-  }else if(t.step === 2){
-    const total = Object.values(a.weekly).reduce((x,y) => x+y, 0);
-    body = `<h1>Ta semaine type</h1><p class="lead">Combien de séances de chaque type tu fais (ou veux faire) par semaine ?</p>
+  if(st === 'prenom'){
+    body = `<p class="hello">Bienvenue sur Mova</p><h1>Comment tu t’appelles&nbsp;?</h1>
+    <div class="field" style="margin-top:18px"><label for="t-prenom">Ton prénom</label><input id="t-prenom" data-ta="prenom" value="${esc(a.prenom)}" placeholder="Marion" autocomplete="given-name" style="font-size:20px"></div>
+    <p class="small muted" style="margin-top:10px">Tout reste sur ton téléphone : ton profil, tes séances et tes charges ne sont partagés avec personne.</p>`;
+  }else if(st === 'choix'){
+    body = `<p class="hello">Enchanté${a.sexe === 'femme' ? 'e' : ''}, ${esc(a.prenom.trim())} !</p><h1>Ton programme</h1><p class="lead">Tu en as déjà un, ou on le construit ensemble ?</p>
+    <div class="choices" style="margin-top:16px">
+      <button type="button" class="choice" data-act="t-flow" data-v="perso" aria-pressed="${t.flow === 'perso'}"><b>J’ai déjà mon programme</b><span>Je saisis mes exercices, mes charges et mes temps de repos</span></button>
+      <button type="button" class="choice" data-act="t-flow" data-v="create" aria-pressed="${t.flow === 'create'}"><b>Crée mon programme</b><span>Un bilan complet (5 min) et un programme fait pour moi</span></button>
+    </div>`;
+  }else if(st === 'semaine'){
+    const tot = Object.values(a.weekly).reduce((x,y) => x+y, 0);
+    body = `<h1>Ta semaine type</h1><p class="lead">Combien de séances de chaque type tu fais par semaine ?</p>
     <div class="list" style="margin-top:16px">${FOCUS_ORDER.map(f => `<div class="counter">
       <div><div style="font-weight:600">${FOCUS[f]}</div><div class="sub">${FOCUS_SUB[f]}</div></div>
       <button type="button" class="btn icon" data-act="t-count" data-f="${f}" data-d="-1" aria-label="Moins" ${a.weekly[f] ? '' : 'disabled'}>−</button>
       <span class="n num">${a.weekly[f]}</span>
-      <button type="button" class="btn icon" data-act="t-count" data-f="${f}" data-d="1" aria-label="Plus" ${total >= 10 ? 'disabled' : ''}>+</button>
+      <button type="button" class="btn icon" data-act="t-count" data-f="${f}" data-d="1" aria-label="Plus" ${tot >= 10 ? 'disabled' : ''}>+</button>
     </div>`).join('')}</div>
-    <p class="small muted num" style="margin-top:8px">${total} séance${total>1?'s':''} par semaine</p>
-    ${a.weekly.cardio ? `<h2 class="sec">Ton cardio, c’est plutôt…</h2>
-    <div class="pills">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre').map(([k,c]) => `<button type="button" class="pill" data-act="t-cardio" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>` : ''}`;
-  }else if(t.step === 3){
-    body = `<h1>Tes séances</h1><p class="lead">Combien de temps dure une séance, et avec quel matériel ?</p>
-    <h2 class="sec">Durée</h2>
-    <div class="pills">${DURATIONS.map(d => `<button type="button" class="pill" data-act="t-set" data-k="duration" data-v="${d}" data-num="1" aria-pressed="${a.duration===d}">${d} min</button>`).join('')}</div>
-    <h2 class="sec">Matériel</h2>
-    <div class="choices">${Object.entries(EQUIP).map(([k,e]) => `<button type="button" class="choice" data-act="t-set" data-k="equipment" data-v="${k}" aria-pressed="${a.equipment===k}"><b>${e.label}</b><span>${e.sub}</span></button>`).join('')}</div>`;
-  }else{
-    const has = !!journal.programme;
-    body = `<h1>Ton programme</h1><p class="lead">Tu en as déjà un, ou tu veux qu’on te le prépare ?</p>
-    <div class="choices" style="margin-top:16px">
-      <button type="button" class="choice" data-act="t-set" data-k="mode" data-v="perso" aria-pressed="${a.mode==='perso'}"><b>J’ai mon programme</b><span>Je saisis mes exercices, mes charges et mes temps de repos</span></button>
-      <button type="button" class="choice" data-act="t-set" data-k="mode" data-v="ia" aria-pressed="${a.mode==='ia'}"><b>Propose-moi un programme</b><span>Un programme de coach adapté à mes réponses. Je pourrai tout modifier.</span></button>
-      ${has ? `<button type="button" class="choice" data-act="t-set" data-k="mode" data-v="garder" aria-pressed="${a.mode==='garder'}"><b>Garder mon programme actuel</b><span>Mettre à jour seulement mon profil</span></button>` : ''}
+    ${a.weekly.cardio ? `<h2 class="sec">Ton cardio, c’est plutôt…</h2><div class="pills">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>` : ''}`;
+  }else if(st === 'toi'){
+    body = `<h1>Parle-moi de toi</h1><p class="lead">Ça sert à adapter le volume, les charges de départ et les temps de repos.</p>
+    <h2 class="sec">Sexe</h2><div class="pills">${Object.entries(SEXES).map(([k,l]) => pill('sexe', k, l)).join('')}</div>
+    <div class="two" style="margin-top:16px">
+      <div class="field"><label for="t-age">Âge</label><input id="t-age" type="number" inputmode="numeric" min="12" max="100" data-ta="age" value="${esc(a.age)}" placeholder="25"></div>
+      <div class="field"><label for="t-taille">Taille (cm)</label><input id="t-taille" type="number" inputmode="numeric" min="120" max="230" data-ta="taille" value="${esc(a.taille)}" placeholder="168"></div>
+      <div class="field"><label for="t-poids">Poids (kg)</label><input id="t-poids" type="number" inputmode="decimal" min="30" max="250" step="0.1" data-ta="poids" value="${esc(a.poids)}" placeholder="62"></div>
     </div>
-    ${has && (a.mode === 'ia' || a.mode === 'perso') ? `<p class="small muted" style="margin-top:10px">Ton programme actuel sera remplacé. Ton historique de séances est conservé.</p>` : ''}`;
+    <p class="small muted" style="margin-top:10px">Taille et poids sont facultatifs.</p>`;
+  }else if(st === 'objectifs'){
+    body = `<h1>Tes objectifs</h1><p class="lead">Choisis jusqu’à 3 objectifs. Le premier que tu touches est ton objectif principal.</p>
+    <div class="choices" style="margin-top:16px">${Object.entries(GOALS).map(([k,g]) => multi('goals', k, g.label, g.sub)).join('')}</div>
+    <p class="pick-hint num">${a.goals.length}/3 choisis</p>`;
+  }else if(st === 'zones'){
+    body = `<h1>Les zones à travailler</h1><p class="lead">Sur quoi tu veux insister ? Choix multiples.</p>
+    <div class="choices" style="margin-top:16px">${Object.entries(ZONES).map(([k,l]) => multi('zones', k, l, '')).join('')}</div>`;
+  }else if(st === 'niveau'){
+    body = `<h1>Ton niveau</h1><p class="lead">Depuis combien de temps tu t’entraînes régulièrement ?</p>
+    <div class="choices" style="margin-top:16px">${Object.entries(LEVELS).map(([k,l]) => choice('level', k, l.label, l.sub)).join('')}</div>`;
+  }else if(st === 'dispo'){
+    body = `<h1>Tes disponibilités</h1>
+    <h2 class="sec">Séances de muscu par semaine</h2><div class="pills">${[2,3,4,5,6].map(n => pill('days', n, n, true)).join('')}</div>
+    <h2 class="sec">Séances de cardio en plus</h2><div class="pills">${[0,1,2,3].map(n => pill('cardioN', n, n ? n : 'Aucune', true)).join('')}</div>
+    <h2 class="sec">Durée d’une séance</h2><div class="pills">${DURATIONS.map(d => pill('duration', d, d + ' min', true)).join('')}</div>`;
+  }else if(st === 'materiel'){
+    body = `<h1>Ton matériel</h1><p class="lead">Coche tout ce que tu as à disposition.</p>
+    <div class="choices" style="margin-top:16px">${Object.entries(EQUIP2).map(([k,[l,sub]]) => multi('equip', k, l, sub)).join('')}</div>`;
+  }else if(st === 'cardio'){
+    body = `<h1>Ton cardio</h1><p class="lead">Qu’est-ce que tu aimes faire ? Choix multiples.</p>
+    <div class="pills" style="margin-top:16px">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>`;
+  }else if(st === 'limites'){
+    body = `<h1>Douleurs ou blessures</h1><p class="lead">Les exercices qui sollicitent ces zones seront écartés de ton programme.</p>
+    <div class="choices" style="margin-top:16px">${Object.entries(LIMITS).map(([k,l]) => multi('limits', k, l, '')).join('')}</div>
+    <div class="field" style="margin-top:14px"><label for="t-notes">Autre chose à savoir ? (facultatif)</label><textarea id="t-notes" data-ta="notes" placeholder="Ex. : j’adore le hip thrust, je n’aime pas les burpees…">${esc(a.notes)}</textarea></div>
+    <p class="small muted" style="margin-top:10px">En cas de douleur qui dure, demande l’avis d’un médecin ou d’un kiné.</p>`;
+  }else if(st === 'recap'){
+    const row = (l, v) => `<div><span>${l}</span><span>${v}</span></div>`;
+    body = `<h1>Ton bilan</h1><p class="lead">Vérifie, puis je crée ton programme.</p>
+    <div class="list recap" style="margin-top:16px">
+      ${row('Toi', esc([SEXES[a.sexe], a.age ? a.age + ' ans' : '', a.taille ? a.taille + ' cm' : '', a.poids ? fmtN(+a.poids) + ' kg' : ''].filter(Boolean).join(' · ')))}
+      ${row('Objectifs', esc(a.goals.map((g,i) => GOALS[g].label + (i === 0 && a.goals.length > 1 ? ' (principal)' : '')).join(', ')))}
+      ${row('Zones', esc(a.zones.map(z => ZONES[z]).join(', ')))}
+      ${row('Niveau', esc(LEVELS[a.level]?.label || ''))}
+      ${row('Semaine', esc(`${a.days} muscu${a.cardioN ? ` + ${a.cardioN} cardio` : ''} · ${a.duration} min`))}
+      ${row('Matériel', esc(a.equip.map(e => EQUIP2[e][0]).join(', ')))}
+      ${a.cardioN ? row('Cardio', esc(a.cardioTypes.map(c => CARDIO_TYPES[c].label).join(', '))) : ''}
+      ${row('Limites', esc(a.limits.filter(x => x !== 'aucune').map(l => LIMITS[l]).join(', ') || 'Aucune'))}
+    </div>
+    ${journal.programme ? '<p class="small muted" style="margin-top:10px">Ton programme actuel sera remplacé. Ton historique et ton archive sont conservés.</p>' : ''}`;
   }
+  const last = t.i === steps.length - 1 && t.flow;
   return `${bar}${body}
   <div class="test-nav">
-    ${t.step > 0 ? `<button type="button" class="btn" data-act="t-back">Retour</button>` : `<button type="button" class="btn ghost" data-act="t-quit">${journal.profile ? 'Annuler' : 'Plus tard'}</button>`}
-    <button type="button" class="btn primary" data-act="t-next" ${testValid(t) ? '' : 'disabled'}>${t.step < N-1 ? 'Continuer' : a.mode === 'ia' ? 'Créer mon programme' : a.mode === 'perso' ? 'Saisir mon programme' : 'Terminer'}</button>
+    ${t.i > 0 ? `<button type="button" class="btn" data-act="t-back">Retour</button>` : (journal.profile ? `<button type="button" class="btn ghost" data-act="t-quit">Annuler</button>` : '')}
+    <button type="button" class="btn primary" data-act="t-next" ${testValid(t) ? '' : 'disabled'}>${!last ? 'Continuer' : t.flow === 'create' ? 'Créer mon programme' : 'Saisir mon programme'}</button>
   </div>`;
 }
 function finishTest(){
-  const a = ui.test.a;
-  if(a.weekly.cardio && !a.cardioTypes.length) a.cardioTypes = ['tapis'];
-  const mode = a.mode;
-  journal.profile = Object.assign({}, a, {doneAt:new Date().toISOString()});
+  const a = ui.test.a, flow = ui.test.flow;
+  a.prenom = String(a.prenom).trim().slice(0,30);
+  if(a.limits.includes('aucune')) a.limits = [];
+  if(flow === 'create'){
+    a.goal = a.goals[0]; a.equipment = a.equip.includes('salle') ? 'salle' : a.equip.includes('halteres') ? 'halteres' : 'pdc';
+    if(a.cardioN && !a.cardioTypes.length) a.cardioTypes = ['tapis'];
+  }else{
+    if(a.weekly.cardio && !a.cardioTypes.length) a.cardioTypes = ['tapis'];
+    if(!a.goal) a.goal = 'muscle';
+  }
+  journal.profile = Object.assign({}, journal.profile || {}, a, {doneAt:new Date().toISOString(), mode:flow});
   ui.test = null;
-  if(mode === 'perso'){
-    journal.programme = {name:'Mon programme', source:'perso', method:GOALS[a.goal].method, summary:'', days:skeletonDays(a), createdAt:new Date().toISOString()};
+  if(flow === 'perso'){
+    journal.programme = {name:'Mon programme', source:'perso', method:GOALS[a.goal]?.method || 'hyper', summary:'', days:skeletonDays(a), createdAt:new Date().toISOString()};
     ui.editDay = journal.programme.days.find(d => d.kind === 'muscu')?.id || journal.programme.days[0]?.id || null;
-    persist(); go('programme');
+    persist(); render(); go('programme');
     toast('Ajoute tes exercices jour par jour');
-  }else if(mode === 'ia'){
-    persist(); tab = 'programme'; LS.set('pf.tab', tab); window.scrollTo(0,0);
-    generateAI(journal.profile);
-  }else{ persist(); go('semaine'); }
+  }else{
+    journal.programme = buildProgramme(journal.profile);
+    persist(); render(); go('programme');
+    toast(`Ton programme est prêt, ${a.prenom} !`);
+  }
+}
+function buildProgramme(p){
+  const goal0 = p.goals?.[0] || p.goal || 'muscle';
+  const methodKey = GOALS[goal0]?.method || 'hyper', m = METHODS[methodKey];
+  const eq = new Set([...(p.equip || []), 'pdc']);
+  const lim = new Set((p.limits || []).filter(x => x !== 'aucune'));
+  const zones = new Set(p.zones || []);
+  const lowerZ = ['fessiers','jambes'].filter(z => zones.has(z)).length, upperZ = ['dos','pecs','epaules','bras'].filter(z => zones.has(z)).length;
+  const lowerFocus = lowerZ > 0 && lowerZ >= upperZ && !zones.has('global'), upperFocus = upperZ > lowerZ && !zones.has('global');
+  const deb = p.level === 'debutant';
+  const n = +p.days || 3;
+  const split = n <= 2 ? ['full','full']
+    : n === 3 ? (lowerFocus ? ['bas','haut','bas'] : upperFocus ? ['push','bas','pull'] : deb || zones.has('global') ? ['full','full','full'] : ['push','pull','bas'])
+    : n === 4 ? (upperFocus ? ['haut','bas','haut','bas'] : ['bas','haut','bas','haut'])
+    : n === 5 ? (lowerFocus ? ['bas','push','bas','pull','bas'] : ['push','pull','bas','haut','bas'])
+    : ['push','pull','bas','push','pull','bas'];
+  const nEx = Math.max(4, (p.duration <= 30 ? 4 : p.duration <= 45 ? 5 : p.duration <= 60 ? 6 : 7) - (deb ? 1 : 0));
+  const avail = Object.entries(EXDB).filter(([name, [g, z, e, av]]) => e.some(x => eq.has(x)) && !av.some(x => lim.has(x)));
+  const used = {};
+  const pick = (group, count, focus, variant) => {
+    const prevUsed = used[focus + (variant - 1)] || new Set();
+    const cands = avail.filter(([, [g]]) => g === group).map(([name, [g, z, e, av, comp]]) => {
+      let sc = comp ? 2 : 0;
+      if(z.some(x => zones.has(x))) sc += 3;
+      if(prevUsed.has(name)) sc -= 4;
+      if(deb && ['Squat barre','Soulevé de terre roumain','Développé militaire','Tractions','Dips','Rowing barre'].includes(name)) sc -= 1;
+      if((p.notes || '').toLowerCase().includes(name.toLowerCase())) sc += 2;
+      return {name, sc, comp};
+    }).sort((a,b) => b.sc - a.sc);
+    return cands.slice(0, count);
+  };
+  const variants = {};
+  const days = split.map(focus => {
+    const v = variants[focus] = (variants[focus] ?? -1) + 1;
+    const core = zones.has('abdos') || focus === 'full' ? 1 : 0;
+    const k = nEx - core;
+    let parts = [];
+    if(focus === 'bas') parts = pick('bas', k, focus, v);
+    else if(focus === 'push') parts = pick('push', k, focus, v);
+    else if(focus === 'pull') parts = pick('pull', k, focus, v);
+    else if(focus === 'haut'){ const a = Math.ceil(k/2); const P = pick('push', a, focus, v), Q = pick('pull', k - a, focus, v); for(let i = 0; i < Math.max(P.length, Q.length); i++){ if(P[i]) parts.push(P[i]); if(Q[i]) parts.push(Q[i]); } }
+    else { const nb = lowerFocus ? Math.ceil(k/2) : Math.round(k/3); const B = pick('bas', nb, focus, v), P = pick('push', Math.ceil((k-nb)/2), focus, v), Q = pick('pull', k - nb - Math.ceil((k-nb)/2), focus, v); parts = [...B, ...P, ...Q]; }
+    if(core) parts.push(...pick('core', 1, focus + 'core', v));
+    const comp = parts.filter(x => x.comp && EXDB[x.name][0] !== 'core'), iso = parts.filter(x => !x.comp && EXDB[x.name][0] !== 'core'), cr = parts.filter(x => EXDB[x.name][0] === 'core');
+    const ordered = [...comp, ...iso, ...cr];
+    used[focus + v] = new Set(ordered.map(x => x.name));
+    const olderRest = +p.age >= 50 ? 15 : 0;
+    const exercises = ordered.map((x, idx) => {
+      const timed = TIMED.has(x.name);
+      const sets = Math.max(2, (x.comp ? m.sets : Math.min(m.sets, 3)) - (deb ? 1 : 0));
+      const reps = timed ? '30-45 s' : x.comp ? m.reps : (methodKey === 'force' ? '8-10' : methodKey === 'hyper' ? '10-12' : m.reps);
+      const rest = Math.max(30, (x.comp ? m.rest + (methodKey === 'hyper' ? 30 : 0) : m.rest - 15) + olderRest);
+      const ex = {id:newId(), name:x.name, sets, reps, kg:'', rest, tempo:m.tempo, note:''};
+      if(idx === 0 && !deb && (methodKey === 'hyper' || methodKey === 'force') && x.comp && !timed){
+        const pr = methodKey === 'force' ? [6,5,4,3] : [12,10,8,6];
+        ex.varied = true; ex.perSet = pr.map(r => ({kg:'', reps:String(r)})); ex.sets = pr.length;
+        ex.note = 'Charge progressive : ajoute du poids à chaque série.';
+      }
+      if(lim.has('genoux') && EXDB[x.name][0] === 'bas') ex.note = ex.note || 'Amplitude confortable, jamais de douleur au genou.';
+      if(lim.has('dos') && x.comp) ex.note = ex.note || 'Dos neutre, gainage serré.';
+      return ex;
+    });
+    return {id:newId(), name:'', kind:'muscu', focus, exercises};
+  });
+  const counts = {}; days.forEach(d => counts[d.focus] = (counts[d.focus] || 0) + 1);
+  const seen = {}; days.forEach(d => { const i = seen[d.focus] = (seen[d.focus] ?? -1) + 1; d.name = dayName(d.focus, i, counts[d.focus]); });
+  const types = p.cardioTypes?.length ? p.cardioTypes : ['tapis'];
+  for(let c = 0; c < (+p.cardioN || 0); c++){
+    const type = types[c % types.length], minutes = Math.min(+p.duration || 45, 45);
+    days.push({id:newId(), name: (+p.cardioN > 1 ? `Cardio ${'ABC'[c]}` : 'Cardio'), kind:'cardio', focus:'cardio', cardio:{type, minutes, format:cardioFormat(type, goal0, minutes)}});
+  }
+  const zl = [...zones].filter(z => z !== 'global').map(z => ZONES[z].toLowerCase());
+  const summary = `${split.length} séances de muscu${p.cardioN ? ` et ${p.cardioN} de cardio` : ''} par semaine, méthode ${m.label.toLowerCase()} (${m.reps} répétitions, repos ${fmtRest(m.rest)}) pour ton objectif « ${GOALS[goal0].label.toLowerCase()} ».${zl.length ? ` Accent mis sur : ${zl.join(', ')}.` : ''}${lim.size ? ` Exercices choisis pour ménager : ${[...lim].map(l => LIMITS[l].toLowerCase()).join(', ')}.` : ''}`;
+  return {name:`Programme de ${p.prenom || 'toi'}`, source:'auto', method:methodKey, summary, days:interleave(days), createdAt:new Date().toISOString()};
+}
+
+/* ---------- Profil ---------- */
+function viewProfil(){
+  const p = journal.profile || {};
+  const initial = (p.prenom || '?').trim().charAt(0).toUpperCase() || '?';
+  const hasBilan = !!p.goals?.length;
+  const row = (l, v) => `<div><span>${l}</span><span>${v}</span></div>`;
+  return `<button type="button" class="back" data-act="go" data-tab="semaine">← Retour</button>
+  <div class="row" style="margin-top:8px;gap:14px"><div class="avatar-big">${esc(initial)}</div><div><h1>${esc(p.prenom || 'Mon profil')}</h1><p class="small muted">${hasBilan ? 'Bilan fait le ' + fmtDate(p.doneAt) : 'Pas encore de bilan'}</p></div></div>
+  <h2 class="sec">Mes infos</h2>
+  <div class="card stack">
+    <div class="field"><label for="pf-prenom">Prénom</label><input id="pf-prenom" data-pf="prenom" value="${esc(p.prenom || '')}" placeholder="Ton prénom" autocomplete="given-name"></div>
+    <div class="field"><label>Sexe</label><div class="pills">${Object.entries(SEXES).map(([k,l]) => `<button type="button" class="pill" data-act="pf-sexe" data-v="${k}" aria-pressed="${p.sexe === k}">${l}</button>`).join('')}</div></div>
+    <div class="two">
+      <div class="field"><label for="pf-age">Âge</label><input id="pf-age" type="number" inputmode="numeric" data-pf="age" value="${esc(p.age || '')}" placeholder="–"></div>
+      <div class="field"><label for="pf-taille">Taille (cm)</label><input id="pf-taille" type="number" inputmode="numeric" data-pf="taille" value="${esc(p.taille || '')}" placeholder="–"></div>
+      <div class="field"><label for="pf-poids">Poids (kg)</label><input id="pf-poids" type="number" inputmode="decimal" step="0.1" data-pf="poids" value="${esc(p.poids || '')}" placeholder="–"></div>
+    </div>
+    <p class="small muted">Enregistré automatiquement.</p>
+  </div>
+  <h2 class="sec">Mon bilan</h2>
+  ${hasBilan ? `<div class="list recap">
+    ${row('Objectifs', esc(p.goals.map(g => GOALS[g]?.label).filter(Boolean).join(', ')))}
+    ${row('Zones', esc((p.zones || []).map(z => ZONES[z]).join(', ')))}
+    ${row('Niveau', esc(LEVELS[p.level]?.label || ''))}
+    ${row('Semaine', esc(`${p.days} muscu${p.cardioN ? ` + ${p.cardioN} cardio` : ''} · ${p.duration} min`))}
+    ${row('Matériel', esc((p.equip || []).map(e => EQUIP2[e]?.[0]).join(', ')))}
+    ${row('Limites', esc((p.limits || []).map(l => LIMITS[l]).join(', ') || 'Aucune'))}
+  </div>
+  <div class="row" style="margin-top:12px"><button type="button" class="btn" data-act="bilan-start">Refaire mon bilan</button><button type="button" class="btn ${ui.confirmReset ? 'danger' : ''}" data-act="bilan-regen">${ui.confirmReset ? 'Confirmer : remplacer mon programme' : 'Nouveau programme avec ce bilan'}</button></div>`
+  : `<div class="card stack"><p>Fais le bilan complet (5 min) : objectifs, zones à travailler, niveau, matériel, blessures. Je te crée un programme adapté.</p><button type="button" class="btn primary" data-act="bilan-start">Faire mon bilan</button></div>`}`;
 }
 
 /* ---------- Semaine ---------- */
 function viewSemaine(){
+  if(!journal.profile && !ui.test && !ui.skipWelcome) ui.test = newTest();
   if(ui.test) return viewTest();
   const now = new Date(), ws = weekStart(now), we = new Date(ws); we.setDate(we.getDate()+6);
   const range = `${ws.getDate()} ${ws.toLocaleDateString('fr-FR',{month:'short'})} – ${we.getDate()} ${we.toLocaleDateString('fr-FR',{month:'short'})}`;
   if(!journal.profile){
     return `<section class="hero">
       <h1>Bienvenue&nbsp;!</h1>
-      <p class="muted">Commence par le test : 5 questions sur ta façon de t’entraîner. Ensuite, tu saisis ton programme ou on t’en propose un.</p>
-      <div class="row"><button type="button" class="btn primary" data-act="test-start">Faire le test (2 min)</button></div>
+      <p class="muted">Dis-moi ton prénom, puis saisis ton programme ou fais le bilan pour qu’on t’en crée un.</p>
+      <div class="row"><button type="button" class="btn primary" data-act="test-start">Commencer</button></div>
     </section>
     <h2 class="sec">Ce que tu trouveras ici</h2>
     <div class="list">
@@ -1086,10 +1336,11 @@ function viewSemaine(){
   const g = GOALS[journal.profile.goal];
   const meter = ps.rows.map(r => `<span class="${r.done ? 'on' : ''} ${r.day.kind === 'cardio' ? 'c' : ''}"></span>`).join('');
   return `<div class="week-head">
-      <div><p class="small muted" style="text-transform:uppercase;letter-spacing:.08em">Semaine du ${range}</p><h1 class="num">${ps.done} / ${ps.planned || '–'} séances</h1></div>
+      <div>${journal.profile.prenom ? `<p class="hello">Salut ${esc(journal.profile.prenom)} !</p>` : ''}<p class="small muted" style="text-transform:uppercase;letter-spacing:.08em">Semaine du ${range}</p><h1 class="num">${ps.done} / ${ps.planned || '–'} séances</h1></div>
       ${g ? `<span class="chip lilac">${g.label}</span>` : ''}
     </div>
     ${ps.planned ? `<div class="meter">${meter}</div>` : ''}
+    ${!journal.profile.prenom ? `<div class="card row" style="margin-top:16px;justify-content:space-between"><p style="flex:1 1 180px">Ajoute ton prénom et fais ton bilan dans ton profil.</p><button type="button" class="btn sm primary" data-act="go" data-tab="profil">Mon profil</button></div>` : ''}
     ${!journal.programme ? `<div class="card stack" style="margin-top:16px"><p>Tu n’as pas encore de programme.</p><div class="row"><button type="button" class="btn primary" data-act="prog-perso">Saisir mon programme</button><button type="button" class="btn" data-act="prog-ia">Le faire créer</button></div></div>` : ''}
     ${draft ? `<div class="card row" style="margin-top:16px;justify-content:space-between"><div><div style="font-weight:600">${esc(draft.name)}</div><div class="small muted">Séance en cours</div></div><button type="button" class="btn primary" data-act="go" data-tab="seance">Reprendre</button></div>`
       : next ? `<div class="hero" style="margin-top:16px"><p class="small muted" style="margin:0;text-transform:uppercase;letter-spacing:.08em">Prochaine séance</p><h1 style="margin-top:4px">${esc(next.day.name)}</h1><p class="muted">${daySummary(next.day)}</p><div class="row"><button type="button" class="btn primary" data-act="day-start" data-id="${next.day.id}">Commencer</button><button type="button" class="btn" data-act="day-view" data-id="${next.day.id}">Voir le détail</button></div></div>`
@@ -1107,7 +1358,7 @@ function viewSemaine(){
       <button type="button" class="btn" data-act="free-muscu">+ Séance muscu libre</button>
       <button type="button" class="btn" data-act="free-cardio">+ Cardio</button>
     </div>
-    <div class="row" style="margin-top:18px"><button type="button" class="btn sm ghost" data-act="test-start">Refaire le test</button></div>`;
+    <div class="row" style="margin-top:18px"><button type="button" class="btn sm ghost" data-act="go" data-tab="profil">Mon profil et mon bilan</button></div>`;
 }
 function daySummary(d){
   if(d.kind === 'cardio') return `${CARDIO_TYPES[d.cardio?.type]?.label || 'Cardio'} · ${d.cardio?.minutes || '?'} min`;
@@ -1146,7 +1397,7 @@ function viewProgramme(){
     return `${errBox}<h1>Programme</h1><p class="lead">Deux façons de faire : tu saisis le tien, ou tu le fais créer d’après ton test.</p>
     <div class="choices" style="margin-top:16px">
       <button type="button" class="choice" data-act="prog-perso"><b>Saisir mon programme</b><span>Mes exos, mes séries, mes charges, mes temps de repos</span></button>
-      <button type="button" class="choice" data-act="prog-ia"><b>Le faire créer</b><span>${journal.profile ? 'D’après mon test' : 'Je fais d’abord le test (2 min)'}</span></button>
+      <button type="button" class="choice" data-act="prog-ia"><b>Crée mon programme</b><span>${journal.profile?.goals?.length ? 'D’après mon bilan' : 'Je fais d’abord le bilan (5 min)'}</span></button>
     </div>
     <div style="margin-top:20px">${methodGuide(false)}</div>`;
   }
@@ -1155,7 +1406,7 @@ function viewProgramme(){
   return `${errBox}<div class="prog-head">
       <label class="small muted" for="prog-name">Mon programme</label>
       <input id="prog-name" data-p="prog-name" value="${esc(P.name)}" autocomplete="off">
-      <div class="row" style="gap:6px"><span class="chip ${P.source === 'ia' ? 'cardio' : 'muscu'}">${P.source === 'ia' ? 'Créé par l’IA' : P.source === 'auto' ? 'Programme de coach' : 'Programme perso'}</span><span class="chip">Méthode ${m.label.toLowerCase()}</span><span class="chip num">${P.days.length} séance${P.days.length>1?'s':''} / sem.</span></div>
+      <div class="row" style="gap:6px"><span class="chip ${P.source === 'ia' ? 'cardio' : 'muscu'}">${P.source === 'ia' ? 'Créé par l’IA' : P.source === 'auto' ? 'Créé d’après ton bilan' : 'Programme perso'}</span><span class="chip">Méthode ${m.label.toLowerCase()}</span><span class="chip num">${P.days.length} séance${P.days.length>1?'s':''} / sem.</span></div>
       ${P.summary ? `<p class="small muted">${esc(P.summary)}</p>` : ''}
     </div>
     <div class="stack" style="margin-top:16px">
@@ -1836,26 +2087,45 @@ document.addEventListener('click', e => {
     case 'more': ui.histMore += 20; renderView(); break;
 
     /* Test */
-    case 'test-start': ui.test = newTest(); go('semaine'); break;
+    case 'test-start': ui.test = newTest(); ui.skipWelcome = false; go('semaine'); break;
+    case 'bilan-start': ui.test = newTest('create'); go('semaine'); break;
+    case 'bilan-regen':
+      if(!ui.confirmReset && journal.programme){ ui.confirmReset = true; renderView(); break; }
+      ui.confirmReset = false; journal.programme = buildProgramme(journal.profile); persist(); go('programme'); toast('Nouveau programme créé'); break;
+    case 'pf-sexe': journal.profile = Object.assign({}, journal.profile, {sexe:b.dataset.v}); persist(); renderView(); break;
     case 't-set': { const k = b.dataset.k; ui.test.a[k] = b.dataset.num ? +b.dataset.v : b.dataset.v; renderView(); break; }
+    case 't-flow': ui.test.flow = b.dataset.v; renderView(); break;
+    case 't-multi': {
+      const k = b.dataset.k, v = b.dataset.v, arr = ui.test.a[k], i = arr.indexOf(v);
+      if(i >= 0) arr.splice(i, 1);
+      else if(k === 'goals' && arr.length >= 3) { toast('3 objectifs maximum'); break; }
+      else if(k === 'limits' && v === 'aucune') arr.splice(0, arr.length, 'aucune');
+      else if(k === 'zones' && v === 'global') arr.splice(0, arr.length, 'global');
+      else { if(k === 'limits'){ const j = arr.indexOf('aucune'); if(j >= 0) arr.splice(j,1); } if(k === 'zones'){ const j = arr.indexOf('global'); if(j >= 0) arr.splice(j,1); } arr.push(v); }
+      renderView(); break;
+    }
     case 't-count': { const w = ui.test.a.weekly; w[b.dataset.f] = Math.max(0, Math.min(7, (w[b.dataset.f]||0) + +b.dataset.d)); renderView(); break; }
-    case 't-cardio': { const a = ui.test.a.cardioTypes, v = b.dataset.v, i = a.indexOf(v); i >= 0 ? a.splice(i,1) : a.push(v); renderView(); break; }
-    case 't-back': ui.test.step--; renderView(); window.scrollTo(0,0); break;
-    case 't-next': if(!testValid(ui.test)) break; if(ui.test.step < 4){ ui.test.step++; renderView(); window.scrollTo(0,0); } else finishTest(); break;
-    case 't-quit': ui.test = null; renderView(); break;
+    case 't-back': ui.test.i--; if(ui.test.i < 2 && !journal.profile) {} renderView(); window.scrollTo(0,0); break;
+    case 't-next': {
+      if(!testValid(ui.test)) break;
+      const steps = testSteps(ui.test);
+      if(ui.test.i < steps.length - 1 || !ui.test.flow){ ui.test.i++; renderView(); window.scrollTo(0,0); } else finishTest();
+      break;
+    }
+    case 't-quit': ui.test = null; ui.skipWelcome = true; renderView(); break;
 
     /* Programme */
     case 'prog-perso': {
-      if(!journal.profile){ ui.test = newTest(); ui.test.a.mode = 'perso'; go('semaine'); break; }
+      if(!journal.profile){ ui.test = newTest(); ui.test.flow = 'perso'; go('semaine'); break; }
       const P = ensureProgramme();
       if(!P.days.length){ P.days = skeletonDays(journal.profile); P.source = 'perso'; }
       ui.editDay = P.days.find(d => d.kind === 'muscu')?.id || P.days[0]?.id || null;
       persist(); go('programme'); break;
     }
     case 'prog-ia':
-      if(!journal.profile){ ui.test = newTest(); ui.test.a.mode = 'ia'; go('semaine'); toast('Réponds d’abord au test'); break; }
-      tab = 'programme'; LS.set('pf.tab', tab); generateAI(journal.profile); break;
-    case 'prog-local': journal.programme = localProgramme(journal.profile); ui.gen = null; persist(); render(); toast('Programme type créé : modifie-le librement'); break;
+      if(!journal.profile?.goals?.length){ ui.test = newTest('create'); go('semaine'); toast('Fais d’abord ton bilan'); break; }
+      journal.programme = buildProgramme(journal.profile); persist(); go('programme'); toast('Nouveau programme créé'); break;
+    case 'prog-local': journal.programme = journal.profile?.goals?.length ? buildProgramme(journal.profile) : localProgramme(journal.profile); ui.gen = null; persist(); render(); toast('Programme type créé : modifie-le librement'); break;
     case 'gen-stop': ui.gen?.ctl?.abort(); break;
     case 'prog-reset':
       if(!ui.confirmReset){ ui.confirmReset = true; renderView(); break; }
@@ -2035,7 +2305,8 @@ document.addEventListener('input', e => {
     if(s){ s[t.dataset.f] = t.value; saveDraft(); }
   }else if(t.id === 'draft-name' && draft){ draft.name = t.value; saveDraft(); }
   else if(t.dataset.c && draft?.cardio){ draft.cardio[t.dataset.c] = t.value; saveDraft(); updatePace(); }
-  else if(t.dataset.tNotes !== undefined && ui.test){ ui.test.a.notes = t.value.slice(0,600); }
+  else if(t.dataset.ta && ui.test){ const k = t.dataset.ta; ui.test.a[k] = k === 'prenom' ? t.value.slice(0,30) : k === 'notes' ? t.value.slice(0,600) : t.value; const nb = document.querySelector('[data-act="t-next"]'); if(nb) nb.disabled = !testValid(ui.test); }
+  else if(t.dataset.pf){ const k = t.dataset.pf; journal.profile = Object.assign({}, journal.profile, {[k]: k === 'prenom' ? t.value.slice(0,30) : t.value}); persistSoon(); if(k === 'prenom'){ const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (t.value.trim().charAt(0) || '?').toUpperCase(); } }
   else if(t.dataset.iv){
     iv[t.dataset.iv] = Math.max(t.dataset.iv === 'rest' ? 0 : 1, Math.round(+t.value || 0)); iv.names = []; iv.title = ''; ivSave(); updateDials();
   }
@@ -2097,6 +2368,7 @@ $('#picker').addEventListener('click', e => { if(e.target.id === 'picker') close
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape' && ui.picker){ closePicker(); return; }
   if(e.key !== 'Enter') return;
+  if(e.target.id === 't-prenom'){ e.preventDefault(); document.querySelector('[data-act="t-next"]')?.click(); return; }
   if(e.target.id === 'new-ex'){ e.preventDefault(); document.querySelector('[data-act="dx-add"]')?.click(); }
   else if(e.target.id?.startsWith('add-ex-')){ e.preventDefault(); e.target.nextElementSibling?.click(); }
 });
