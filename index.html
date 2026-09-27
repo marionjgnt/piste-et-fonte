@@ -688,13 +688,17 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if(refreshing) return; refreshing = true; location.reload(); });
   navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => {
+    let wake = Date.now();
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wake = Date.now(); });
     const offer = w => {
+      // À l'ouverture de l'appli, sans séance en cours : mise à jour automatique.
+      if(!draft && !ui.test && !ui.picker && !editing() && Date.now() - wake < 15000){ w.postMessage('skipWaiting'); return; }
       const box = $('#update'); box.hidden = false;
       $('#update-btn').onclick = () => { if(draft) saveDraft(); w.postMessage('skipWaiting'); };
     };
