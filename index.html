@@ -231,6 +231,30 @@ details.card[open] > summary::after{content:" ▾"}
 .check svg{opacity:.35}
 .set-row.done .check{background:var(--good-fill);border-color:var(--good-fill);color:var(--ink)}
 .set-row.done .check svg{opacity:1}
+.feel{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px 42px}
+.feel button{min-height:32px;padding:0 11px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);font-size:13px;font-weight:600;color:var(--ink-2)}
+.feel button[aria-pressed="true"][data-v="facile"]{background:var(--good-fill);border-color:var(--good-fill);color:var(--ink)}
+.feel button[aria-pressed="true"][data-v="bien"]{background:var(--lane-fill);border-color:var(--lane-fill);color:var(--lane-ink)}
+.feel button[aria-pressed="true"][data-v="dur"]{background:var(--peach);border-color:var(--peach);color:var(--ink)}
+.feel button[aria-pressed="true"][data-v="max"]{background:var(--accent-fill);border-color:var(--accent-fill);color:var(--accent-ink)}
+.feel input{flex:1 1 100%;min-width:0;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:0 10px;font-size:16px}
+.last{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--lilac-soft);font-size:14px;display:flex;flex-direction:column;gap:3px}
+.last i{color:var(--ink-2)}
+.advice{font-weight:600;margin-top:2px}
+.advice.up{color:var(--good)}
+.advice.down{color:var(--danger)}
+.coach{margin:-2px 0 12px 42px;padding:10px 12px;border-radius:14px 14px 14px 4px;background:var(--lane-soft);font-size:14px;display:flex;flex-direction:column;gap:6px}
+.coach b{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--lane)}
+.coach .btn{align-self:flex-start}
+.adv-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.adv-row:first-child{border-top:0}
+.adv-row .d{grid-column:1/-1;font-size:13px;color:var(--ink-2)}
+.verdict{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.verdict.up{background:var(--good-fill);color:var(--ink)}
+.verdict.keep{background:var(--lilac-soft);color:var(--ink);border:1.5px solid var(--lilac)}
+.verdict.down{background:var(--peach);color:var(--ink)}
+.advice.keep{color:var(--accent)}
+.entry .fb{grid-column:2/-1;font-size:13px;color:var(--ink-2);margin-top:-2px}
 .ex-foot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px}
 .ex-foot .hint{font-size:13px;color:var(--ink-2);margin-left:auto}
 .add-ex{display:flex;gap:8px}
@@ -593,7 +617,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.6';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -729,6 +753,84 @@ let toastT = null;
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2800); }
 
 /* ================= Logique programme ================= */
+const FEELS = {facile:'Facile', bien:'Moyen', dur:'Dur', max:'Très dur'};
+function feelText(sets){
+  const parts = sets.map((x,k) => x.feel || x.note ? `S${k+1} ${x.feel ? FEELS[x.feel]?.toLowerCase() || '' : ''}${x.note ? (x.feel ? ' : ' : ': ') + x.note : ''}` : '').filter(Boolean);
+  return parts.join(' · ');
+}
+function advice(sets){
+  const f = sets.map(x => x.feel).filter(Boolean);
+  if(!f.length) return null;
+  const n = f.length, cnt = v => f.filter(x => x === v).length;
+  const top = Math.max(0, ...sets.map(x => +x.kg || 0));
+  const inc = top >= 60 ? 5 : 2.5;
+  if(cnt('max') >= Math.ceil(n/2)){
+    return top ? {cls:'down', kind:'Baisse un peu', delta:-2.5, txt:`Trop dur : baisse un peu (−2,5 kg) pour faire toutes tes répétitions proprement.`}
+               : {cls:'down', kind:'Baisse un peu', delta:0, txt:'Trop dur : fais 1 à 2 répétitions de moins par série.'};
+  }
+  if(cnt('max') || cnt('dur')) return {cls:'keep', kind:'Reste', delta:0, txt:'Reste sur ce poids encore une semaine.'};
+  if(cnt('facile') >= Math.ceil(n/2)){
+    return top ? {cls:'up', kind:'Augmente', delta:inc, txt:`C’était facile : augmente de ${fmtN(inc)} kg.`}
+               : {cls:'up', kind:'Augmente', delta:0, txt:'C’était facile : ajoute 1 à 2 répétitions par série.'};
+  }
+  return {cls:'keep', kind:'Reste', delta:0, txt:'C’était moyen : reste sur ce poids encore une semaine, tu progresses.'};
+}
+function coachTip(E, k){
+  const sets = E.sets, s = sets[k], next = sets[k+1];
+  const kg = parseFloat(String(s.kg).replace(',','.')) || 0, reps = parseInt(s.reps) || 0;
+  const f = s.feel, done = sets.slice(0, k+1).map(x => x.feel).filter(Boolean);
+  const inc = kg >= 60 ? 5 : 2.5;
+  const nkg = next ? parseFloat(String(next.kg).replace(',','.')) || 0 : 0;
+  if(next){
+    if(f === 'facile'){
+      if(nkg > kg) return {txt:`Facile ! Continue, la prochaine série monte à ${fmtN(nkg)} kg.`};
+      if(kg) return {txt:`Facile ! Tu peux mettre ${fmtN(kg + inc)} kg sur la prochaine série.`, act:'coach-next', kg:kg + inc, label:`Mettre ${fmtN(kg + inc)} kg`};
+      return {txt:'Facile ! Ajoute 1 à 2 répétitions sur la prochaine série.'};
+    }
+    if(f === 'bien') return {txt: nkg ? `Bonne zone, continue comme prévu : ${fmtN(nkg)} kg.` : 'Bonne zone, continue comme prévu.'};
+    if(f === 'dur'){
+      if(nkg > kg) return {txt:`Dur : reste à ${fmtN(kg)} kg sur la prochaine série au lieu de ${fmtN(nkg)}.`, act:'coach-next', kg, label:`Rester à ${fmtN(kg)} kg`};
+      return {txt:'Dur : garde la charge et vise les mêmes répétitions. Prends bien ton repos.'};
+    }
+    if(kg > 2.5) return {txt:`Très dur : baisse à ${fmtN(Math.min(nkg || kg, kg) - 2.5)} kg pour la prochaine série et fais tes répétitions proprement.`, act:'coach-next', kg:Math.min(nkg || kg, kg) - 2.5, label:`Passer à ${fmtN(Math.min(nkg || kg, kg) - 2.5)} kg`};
+    return {txt:'Très dur : fais 1 à 2 répétitions de moins sur la prochaine série.'};
+  }
+  // Dernière série de l'exercice
+  const allDone = sets.every(x => x.done);
+  if(allDone && done.length && !done.some(x => x === 'dur' || x === 'max') && sets.length < 8){
+    const prev = sets[k-1];
+    const pkg = prev ? parseFloat(String(prev.kg).replace(',','.')) || 0 : 0, preps = prev ? parseInt(prev.reps) || 0 : 0;
+    const step = kg && pkg && kg > pkg ? kg - pkg : (kg ? inc : 0);
+    const r = reps && preps > reps ? Math.max(1, reps - (preps - reps)) : reps;
+    const xk = kg ? kg + step : 0;
+    return {txt:'Tu as encore de la marge : tente une série de plus !', act:'coach-extra', kg:xk, reps:r, label:`Ajouter ${xk ? fmtN(xk) + ' kg × ' : ''}${r || '?'}${xk ? '' : ' rép.'}`};
+  }
+  if(f === 'dur' || f === 'max') return {txt:'Bien joué, tu es allé chercher tes limites. Exercice terminé !'};
+  return {txt:'Exercice terminé, bravo !'};
+}
+function lastExFor(name){
+  const n = name.trim().toLowerCase();
+  for(const s of journal.sessions){
+    const ex = (s.exercises||[]).find(e => e.name.trim().toLowerCase() === n);
+    if(ex && ex.sets.length) return {date:s.date, sets:ex.sets};
+  }
+  return null;
+}
+function weeklyAdvice(){
+  const names = new Map();
+  (journal.programme?.days || []).forEach(d => (d.exercises||[]).forEach(e => names.set(e.name.trim().toLowerCase(), e.name)));
+  const since = Date.now() - 28*86400000;
+  journal.sessions.forEach(s => { if(new Date(s.date).getTime() >= since) (s.exercises||[]).forEach(e => { const k = e.name.trim().toLowerCase(); if(!names.has(k)) names.set(k, e.name); }); });
+  const out = [];
+  names.forEach(name => {
+    const last = lastExFor(name); if(!last || new Date(last.date).getTime() < since) return;
+    const ad = advice(last.sets); if(!ad) return;
+    const top = Math.max(0, ...last.sets.map(x => +x.kg || 0));
+    out.push({name, last, ad, target: top && ad.delta ? top + ad.delta : null});
+  });
+  const order = {up:0, down:1, keep:2};
+  return out.sort((a,b) => order[a.ad.cls] - order[b.ad.cls]);
+}
 function lastSetsFor(name){
   const n = name.trim().toLowerCase();
   for(const s of journal.sessions){
@@ -738,7 +840,7 @@ function lastSetsFor(name){
   return null;
 }
 const planText = plan => plan.map(p => `${p.kg !== '' && p.kg != null ? fmtN(+p.kg) + ' kg' : '–'} × ${p.reps || '?'}`).join(', ');
-const setsText = sets => sets.map(x => x.kg ? `${x.reps}×${fmtN(x.kg)}` : `${x.reps}`).join(', ');
+const setsText = sets => sets.map(x => x.kg ? `${fmtN(x.kg)} kg × ${x.reps}` : `${x.reps} rép.`).join(', ');
 const volume = s => (s.exercises||[]).reduce((a,e) => a + e.sets.reduce((b,x) => b + (+x.reps||0)*(+x.kg||0), 0), 0);
 
 function planStatus(){
@@ -994,6 +1096,8 @@ function viewSemaine(){
     ${draft ? `<div class="card row" style="margin-top:16px;justify-content:space-between"><div><div style="font-weight:600">${esc(draft.name)}</div><div class="small muted">Séance en cours</div></div><button type="button" class="btn primary" data-act="go" data-tab="seance">Reprendre</button></div>`
       : next ? `<div class="hero" style="margin-top:16px"><p class="small muted" style="margin:0;text-transform:uppercase;letter-spacing:.08em">Prochaine séance</p><h1 style="margin-top:4px">${esc(next.day.name)}</h1><p class="muted">${daySummary(next.day)}</p><div class="row"><button type="button" class="btn primary" data-act="day-start" data-id="${next.day.id}">Commencer</button><button type="button" class="btn" data-act="day-view" data-id="${next.day.id}">Voir le détail</button></div></div>`
       : ps.planned ? `<div class="card" style="margin-top:16px"><h3>Semaine bouclée</h3><p class="muted small" style="margin-top:4px">Toutes les séances prévues sont faites. Récupère bien, ou ajoute une séance bonus.</p></div>` : ''}
+    ${(() => { const wa = weeklyAdvice(); return wa.length ? `<h2 class="sec">Tes conseils de la semaine</h2>
+    <div class="list">${wa.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? ` · ${fmtN(w.target)} kg` : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>` : ''; })()}
     ${ps.planned ? `<h2 class="sec">Mon plan</h2>
     <div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && next && r.day.id === next.day.id ? 'next' : ''}">
       <span class="dot">${r.done ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>' : ''}</span>
@@ -1216,12 +1320,13 @@ function viewMuscuDraft(){
           <input id="r-${i}-${k}" type="number" inputmode="numeric" min="0" step="1" data-f="reps" data-ex="${i}" data-set="${k}" value="${esc(s.reps)}" aria-label="Répétitions série ${k+1}">
           <input id="k-${i}-${k}" type="number" inputmode="decimal" min="0" step="0.5" data-f="kg" data-ex="${i}" data-set="${k}" value="${esc(s.kg)}" placeholder="–" aria-label="Charge série ${k+1}">
           <button type="button" class="check" data-act="set-done" data-ex="${i}" data-set="${k}" aria-pressed="${!!s.done}" aria-label="Série faite"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></button>
-        </div>`).join('')}
+        </div>${s.done ? `<div class="feel" role="group" aria-label="Ressenti série ${k+1}">${Object.entries(FEELS).map(([v,l]) => `<button type="button" data-act="feel" data-ex="${i}" data-set="${k}" data-v="${v}" aria-pressed="${s.feel === v}">${l}</button>`).join('')}
+          <input id="fn-${i}-${k}" data-f="note" data-ex="${i}" data-set="${k}" value="${esc(s.note || '')}" placeholder="Ressenti série ${k+1} : ok mais dur à partir de la 11e…" autocomplete="off" aria-label="Ressenti série ${k+1}"></div>` : ''}${s.done && s.feel && k === e.sets.reduce((m,x,j) => x.done && x.feel ? j : m, -1) ? (() => { const tip = coachTip(e, k); return `<div class="coach" role="status"><b>Coach</b><span>${esc(tip.txt)}</span>${tip.act ? `<button type="button" class="btn sm lane" data-act="${tip.act}" data-ex="${i}" data-set="${k}" data-kg="${tip.kg}" data-reps="${tip.reps ?? ''}">${esc(tip.label)}</button>` : ''}</div>`; })() : ''}`).join('')}
         <div class="ex-foot">
           <button type="button" class="btn sm" data-act="set-add" data-ex="${i}">+ Série</button>
           ${e.sets.length > 1 ? `<button type="button" class="btn sm ghost" data-act="set-del" data-ex="${i}">− Série</button>` : ''}
-          ${prev ? `<span class="hint num">La dernière fois : ${esc(setsText(prev))}</span>` : ''}
         </div>
+        ${prev ? (() => { const ad = advice(prev), ft = feelText(prev); return `<div class="last num"><span>La dernière fois : <b>${esc(setsText(prev))}</b></span>${ft ? `<i>${esc(ft)}</i>` : ''}${ad ? `<span class="advice ${ad.cls}">${ad.txt}</span>` : ''}${ad && ad.delta ? `<button type="button" class="btn sm ${ad.delta > 0 ? 'primary' : ''}" style="align-self:flex-start;margin-top:4px" data-act="apply-adv" data-ex="${i}" data-d="${ad.delta}">${ad.delta > 0 ? 'Mettre' : 'Passer à'} ${esc(fmtN(Math.max(0, ...prev.map(x => +x.kg || 0)) + ad.delta))} kg</button>` : ''}</div>`; })() : ''}
       </article>`;
     }).join('')}
     <button type="button" class="btn wide add-big" data-act="pk-open" data-target="draft">+ Ajouter des exercices</button>
@@ -1526,8 +1631,10 @@ function viewArchive(){
     let rows = '';
     desc.forEach((e,i) => {
       const prev = desc[i+1];
+      const fb = feelText(e.sets);
       rows += `<div class="entry"><span class="dt">${shortDate(e.date)}</span><span class="w num">${setsSummary(e.sets, meta.perSide)}</span>
-        ${A.demo ? '' : (ui.confirmDel === 'ae:' + e.sid ? `<button type="button" class="btn sm danger" data-act="arch-del-ok" data-sid="${e.sid}">Confirmer</button>` : `<button type="button" class="btn icon ghost" data-act="arch-del" data-sid="${e.sid}" aria-label="Supprimer cette ligne">✕</button>`)}</div>`;
+        ${A.demo ? '' : (ui.confirmDel === 'ae:' + e.sid ? `<button type="button" class="btn sm danger" data-act="arch-del-ok" data-sid="${e.sid}">Confirmer</button>` : `<button type="button" class="btn icon ghost" data-act="arch-del" data-sid="${e.sid}" aria-label="Supprimer cette ligne">✕</button>`)}
+        ${fb ? `<span class="fb">${esc(fb)}</span>` : ''}</div>`;
       if(prev){
         const days = Math.round((new Date(e.date) - new Date(prev.date))/86400000);
         if(days >= 13) rows += `<div class="gap">${Math.round(days/7)} semaines sans cet exercice</div>`;
@@ -1796,6 +1903,14 @@ document.addEventListener('click', e => {
     case 'dx-remove': draft.exercises.splice(ex,1); saveDraft(); renderView(); break;
     case 'set-add': { const sets = draft.exercises[ex].sets, last = sets[sets.length-1] || {reps:'',kg:''}; sets.push({reps:last.reps, kg:last.kg, done:false}); saveDraft(); renderView(); document.getElementById(`r-${ex}-${sets.length-1}`)?.focus(); break; }
     case 'set-del': draft.exercises[ex].sets.pop(); saveDraft(); renderView(); break;
+    case 'coach-next': { const nx = draft.exercises[ex]?.sets[st+1]; if(!nx) break; nx.kg = String(Math.max(0, Math.round(+b.dataset.kg*100)/100)); saveDraft(); renderView(); toast(`Série ${st+2} : ${fmtN(+nx.kg)} kg`); break; }
+    case 'coach-extra': { const E = draft.exercises[ex]; if(!E) break; E.sets.push({reps:b.dataset.reps || '', kg:+b.dataset.kg ? String(Math.round(+b.dataset.kg*100)/100) : '', done:false}); saveDraft(); renderView(); document.getElementById(`r-${ex}-${E.sets.length-1}`)?.scrollIntoView({block:'center'}); toast('Série bonus ajoutée, allez !'); break; }
+    case 'apply-adv': {
+      const E = draft.exercises[ex], prev = lastSetsFor(E.name), dlt = +b.dataset.d; if(!prev) break;
+      E.sets.forEach((x, k) => { const base = +(prev[Math.min(k, prev.length-1)]?.kg) || 0; if(base) x.kg = String(Math.max(0, Math.round((base + dlt)*100)/100)); });
+      saveDraft(); renderView(); toast(dlt > 0 ? `Charges augmentées de ${fmtN(dlt)} kg` : `Charges baissées de ${fmtN(-dlt)} kg`); break;
+    }
+    case 'feel': { const s = draft.exercises[ex]?.sets[st]; if(!s) break; s.feel = s.feel === b.dataset.v ? '' : b.dataset.v; saveDraft(); renderView(); break; }
     case 'set-done': {
       const E = draft.exercises[ex], s = E.sets[st];
       s.done = !s.done; saveDraft(); renderView();
@@ -1803,7 +1918,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'finish': {
-      const exercises = draft.exercises.map(e => ({name:e.name, sets:e.sets.filter(s => +s.reps > 0).map(s => ({reps:+s.reps, kg:+s.kg || 0}))})).filter(e => e.sets.length);
+      const exercises = draft.exercises.map(e => ({name:e.name, sets:e.sets.filter(s => +s.reps > 0).map(s => { const o = {reps:+s.reps, kg:+s.kg || 0}; if(s.feel) o.feel = s.feel; if(s.note && s.note.trim()) o.note = s.note.trim().slice(0,200); return o; })})).filter(e => e.sets.length);
       if(!exercises.length){ ui.msg = 'Remplis au moins une série (nombre de répétitions) avant d’enregistrer.'; renderView(); break; }
       journal.sessions.unshift({id:newId(), date:new Date(draft.startedAt).toISOString(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin:Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), exercises});
       draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('semaine');
