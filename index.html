@@ -278,6 +278,14 @@ details.card[open] > summary::after{content:" ▾"}
 .food:first-child{border-top:0}
 .food .q{font-size:13px;color:var(--ink-2)}
 .food .pr{font-family:var(--display);font-size:20px;font-weight:600;grid-row:1/3;grid-column:2;align-self:center}
+.squares{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.sq{position:relative;min-height:180px;border:0;border-radius:24px;padding:16px;text-align:left;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);color:var(--ink);min-width:0}
+.sq svg{width:30px;height:30px;flex:none}
+.sq b{font-family:var(--display);font-size:26px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;line-height:1;margin-top:10px}
+.sq span.p{font-size:13px;line-height:1.35;color:var(--ink-2)}
+.sq.s1{background:var(--peach-soft)} .sq.s2{background:var(--lilac-soft)} .sq.s3{background:var(--accent-soft)} .sq.s4{background:var(--good-soft)}
+.sq .live-tag{position:absolute;top:14px;right:14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-fill);color:var(--accent-ink);padding:3px 8px;border-radius:999px}
+@media (max-width:360px){.sq b{font-size:22px}.sq span.p{font-size:12px}}
 .adv-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
 .adv-row:first-child{border-top:0}
 .adv-row .d{grid-column:1/-1;font-size:13px;color:var(--ink-2)}
@@ -349,7 +357,7 @@ details.card[open] > summary::after{content:" ▾"}
 .rest-pill .t{font-family:var(--display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;min-width:52px}
 .rest-pill button{border:0;border-radius:999px;background:rgba(127,127,127,.25);color:inherit;min-height:34px;padding:0 12px;font-size:14px;font-weight:600}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr)}
 .tabs button{border:0;background:transparent;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;letter-spacing:-.01em;line-height:1.1;text-align:center;padding:0 2px;font-weight:600;color:var(--ink-2);position:relative;padding:0}
 .tabs button[aria-current="page"]{color:var(--accent)}
 .tabs button[aria-current="page"] svg{background:var(--accent-soft);border-radius:10px;padding:2px;box-sizing:content-box;margin-block:-2px}
@@ -435,11 +443,8 @@ details.card[open] > summary::after{content:" ▾"}
 
 <div class="tabs">
   <nav id="tabs" aria-label="Sections">
-    <button type="button" data-tab="semaine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>Récap</button>
-    <button type="button" data-tab="programme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Mon programme</button>
-    <button type="button" data-tab="seance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>Faire ma séance</button>
+    <button type="button" data-tab="activite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>Mon activité</button>
     <button type="button" data-tab="alimentation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.5-1.8-4.5-2-6 0-2 2.6-.8 8 1.5 11 1.2 1.6 2.6 2 4.5 1 1.9 1 3.3.6 4.5-1 2.3-3 3.5-8.4 1.5-11-1.5-2-4.5-1.8-6 0z"/><path d="M12 7c0-2 1-3.5 3-4"/></svg>Alimentation</button>
-    <button type="button" data-tab="suivi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>Mon suivi</button>
   </nav>
 </div>
 
@@ -707,7 +712,8 @@ let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
-if(!['semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
+if(!['activite','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
+tab = tab === 'alimentation' ? 'alimentation' : 'activite';
 if(profileIncomplete()) tab = 'semaine';
 if(tab === 'archive' || tab === 'progres') tab = 'suivi';
 let chronoMode = LS.get('pf.chrono', 'repos');
@@ -853,7 +859,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.5.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1217,16 +1223,18 @@ async function generateAI(p){
 /* ================= Vues ================= */
 function renderTabs(){
   document.querySelectorAll('#tabs button').forEach(b => {
-    if(b.dataset.tab === tab) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    const on = b.dataset.tab === 'activite' ? ACTIVITY_TABS.includes(tab) : b.dataset.tab === tab;
+    if(on) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
     const dot = b.querySelector('.live');
-    if(b.dataset.tab === 'seance' && draft && !dot){ const s = document.createElement('span'); s.className = 'live'; b.append(s); }
-    if(dot && !(b.dataset.tab === 'seance' && draft)) dot.remove();
+    if(b.dataset.tab === 'activite' && draft && !dot){ const s = document.createElement('span'); s.className = 'live'; b.append(s); }
+    if(dot && !(b.dataset.tab === 'activite' && draft)) dot.remove();
   });
 }
 function render(){ renderTabs(); renderView(); updatePill(); const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (journal.profile?.prenom || '?').trim().charAt(0).toUpperCase() || '?'; }
 function renderView(){
   const v = $('#view');
-  v.innerHTML = ({semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewSemaine)();
+  v.innerHTML = ({activite:viewActivite, semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewActivite)();
+  if(['semaine','programme','seance','suivi'].includes(tab) && !ui.test) v.insertAdjacentHTML('afterbegin', `<button type="button" class="back" data-act="go" data-tab="activite" style="margin-bottom:6px">← Mon activité</button>`);
   if(tab === 'seance' && draft?.kind === 'cardio') updatePace();
   if(tab === 'semaine') renderGroup();
   updateDials();
@@ -1665,7 +1673,7 @@ function viewProfil(){
   const initial = (p.prenom || '?').trim().charAt(0).toUpperCase() || '?';
   const hasBilan = !!p.goals?.length;
   const row = (l, v) => `<div><span>${l}</span><span>${v}</span></div>`;
-  return `<button type="button" class="back" data-act="go" data-tab="semaine">← Retour</button>
+  return `<button type="button" class="back" data-act="go" data-tab="activite">← Retour</button>
   <div class="row" style="margin-top:8px;gap:14px"><div class="avatar-big">${esc(initial)}</div><div><h1>${esc(p.prenom || 'Mon profil')}</h1><p class="small muted">${hasBilan ? 'Bilan fait le ' + fmtDate(p.doneAt) : 'Pas encore de bilan'}</p></div></div>
   <h2 class="sec">Mes infos</h2>
   <div class="card stack">
@@ -1691,6 +1699,20 @@ function viewProfil(){
   </div>
   <div class="row" style="margin-top:12px"><button type="button" class="btn" data-act="bilan-start">Refaire mon bilan</button><button type="button" class="btn ${ui.confirmReset ? 'danger' : ''}" data-act="bilan-regen">${ui.confirmReset ? 'Confirmer : remplacer mon programme' : 'Nouveau programme avec ce bilan'}</button></div>`
   : `<div class="card stack"><p>Fais le bilan complet (5 min) : objectifs, zones à travailler, niveau, matériel, blessures. Je te crée un programme adapté.</p><button type="button" class="btn primary" data-act="bilan-start">Faire mon bilan</button></div>`}`;
+}
+
+const SQ_ICONS = {semaine:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>`,programme:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,seance:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>`,suivi:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>`};
+const ACTIVITY_TABS = ['activite','semaine','programme','seance','suivi','chrono','archive','progres'];
+function viewActivite(){
+  const p = journal.profile || {};
+  const sq = (t, cls, title, phrase, extra = '') => `<button type="button" class="sq ${cls}" data-act="go" data-tab="${t}">${SQ_ICONS[t]}${extra}<b>${title}</b><span class="p">${phrase}</span></button>`;
+  return `${p.prenom ? `<p class="hello">Salut ${esc(p.prenom)} !</p>` : ''}<h1>Mon activité</h1>
+  <div class="squares">
+    ${sq('semaine', 's1', 'Récap', 'Ta semaine en un coup d’œil : séances faites, prochaine séance et conseils pour progresser.')}
+    ${sq('programme', 's2', 'Programme', 'Retrouve ici ton programme détaillé, que tu peux modifier quand tu le souhaites.')}
+    ${sq('seance', 's3', 'Séance', 'Suis ton programme étape par étape, avec ton chrono de repos et ton coach.', draft ? '<span class="live-tag">En cours</span>' : '')}
+    ${sq('suivi', 's4', 'Suivi', 'Tes courbes, tes records et l’historique de toutes tes séances.')}
+  </div>`;
 }
 
 /* ---------- Semaine ---------- */
@@ -2119,7 +2141,7 @@ function viewProgres(){
   const recs = Object.entries(best).sort((a,b) => b[1].kg - a[1].kg).slice(0,6);
   const runs = S.filter(s => s.kind === 'cardio' && ['course','tapis'].includes(s.cardio?.type) && s.cardio.km >= 5);
   const bestRun = runs.slice().sort((a,b) => a.cardio.sec/a.cardio.km - b.cardio.sec/b.cardio.km)[0];
-  return `<h1>Mon suivi</h1>${suiviSeg()}
+  return `<h1>Suivi</h1>${suiviSeg()}
   ${j.demo ? '<p class="small muted" style="margin-top:6px">Données d’exemple. Tes vrais chiffres s’afficheront dès ta première séance.</p>' : ''}
   <h2 class="sec">Cette semaine</h2>
   <div class="tiles">
@@ -2128,7 +2150,7 @@ function viewProgres(){
     <div class="tile"><span class="v num">${fmtN(wk.kcal)}<small> kcal</small></span><span class="l">Calories dépensées</span></div>
     <div class="tile"><span class="v num">${fmtN(wk.km)}<small> km</small></span><span class="l">Cardio</span></div>
   </div>
-  <p class="small muted" style="margin-top:8px">Estimations : la durée réelle de ta séance quand tu la lances et la termines dans l’appli, sinon calculée exercice par exercice : répétitions × temps d’une répétition, tes pauses entre les séries et le passage d’un exercice à l’autre (détail dans Mon suivi → Par séance). Calories calculées avec ton poids${journal.profile?.poids ? '' : ' (65 kg par défaut, renseigne le tien dans ton profil)'}.</p>
+  <p class="small muted" style="margin-top:8px">Estimations : la durée réelle de ta séance quand tu la lances et la termines dans l’appli, sinon calculée exercice par exercice : répétitions × temps d’une répétition, tes pauses entre les séries et le passage d’un exercice à l’autre (détail dans Suivi → Par séance). Calories calculées avec ton poids${journal.profile?.poids ? '' : ' (65 kg par défaut, renseigne le tien dans ton profil)'}.</p>
   <h2 class="sec">8 dernières semaines</h2>
   <div class="card chart">${svg}<div class="legend"><span style="--c:var(--chart-a)">Muscu et circuits</span><span style="--c:var(--chart-b)">Cardio</span></div></div>
   <h2 class="sec">Records</h2>
@@ -2345,11 +2367,11 @@ function viewArchive(){
 
   if(ui.archMode === 'seance'){
     const list = A.sessions.filter(s => s.kind === 'cardio' || (s.exercises||[]).length || s.circuit).slice().sort((a,b) => String(b.date).localeCompare(String(a.date)));
-    if(!list.length) return `<h1>Mon suivi</h1>${seg}<div class="card" style="margin-top:14px"><p class="muted">Tes séances terminées se rangeront ici, semaine par semaine.</p></div>`;
+    if(!list.length) return `<h1>Suivi</h1>${seg}<div class="card" style="margin-top:14px"><p class="muted">Tes séances terminées se rangeront ici, semaine par semaine.</p></div>`;
     const first = weekStart(list[list.length-1].date).getTime();
     const weeks = [];
     list.forEach(s => { const k = weekKey(s.date); let w = weeks[weeks.length-1]; if(!w || w.k !== k){ w = {k, start:weekStart(s.date), items:[]}; weeks.push(w); } w.items.push(s); });
-    return `<h1>Mon suivi</h1>${seg}${demoNote}
+    return `<h1>Suivi</h1>${seg}${demoNote}
     ${weeks.map(w => {
       const n = Math.round((w.start.getTime() - first)/(7*86400000)) + 1, end = new Date(w.start); end.setDate(end.getDate()+6);
       return `<div class="week-block"><div class="week-title"><b>Semaine ${n}</b><span class="small muted">${w.start.getDate()} ${w.start.toLocaleDateString('fr-FR',{month:'short'})} – ${end.getDate()} ${end.toLocaleDateString('fr-FR',{month:'short'})}</span></div>
@@ -2364,7 +2386,7 @@ function viewArchive(){
 
   const q = exKey(ui.archQ);
   const items = Object.values(idx).filter(it => !q || it.key.includes(q)).sort((a,b) => String(b.entries[b.entries.length-1].date).localeCompare(String(a.entries[a.entries.length-1].date)));
-  return `<h1>Mon suivi</h1>${seg}${demoNote}
+  return `<h1>Suivi</h1>${seg}${demoNote}
     <input class="search" id="arch-q" type="search" placeholder="Chercher un exercice…" value="${esc(ui.archQ)}" style="margin-top:14px" aria-label="Chercher un exercice">
     <div class="list" style="margin-top:12px" id="arch-list">${items.length ? items.map(it => {
       const meta = exMetaOf(it.name), last = it.entries[it.entries.length-1], same = it.entries.filter(e => e.pat === last.pat), first = same.find(e => e.max > 0);
