@@ -191,6 +191,7 @@ textarea{width:100%;min-height:90px;border-radius:12px;border:1px solid var(--li
 .ed .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .ed .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .ed label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+.ed label input,.ed label select,.ed label textarea{font-size:16px;text-transform:none;letter-spacing:0;color:var(--ink)}
 @media (max-width:400px){.ed .grid4{grid-template-columns:repeat(2,1fr)}.ed .grid2{grid-template-columns:1fr}}
 .gen{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 16px;text-align:center}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--surface-2);border-top-color:var(--accent);animation:spin 1s linear infinite}
@@ -288,8 +289,29 @@ details.card[open] > summary::after{content:" ▾"}
 .tabs button[aria-current="page"] svg{background:var(--accent-soft);border-radius:10px;padding:2px;box-sizing:content-box;margin-block:-2px}
 .tabs button .live{position:absolute;top:10px;right:calc(50% - 18px);width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .tabs svg{width:24px;height:24px}
-.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
+.toast{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:50;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:reduce){.bar b{transition:none}.spinner{animation-duration:3s}}
+/* Liste d'exercices */
+.picker{position:fixed;inset:0;z-index:35;background:rgba(42,33,64,.35);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:600px;height:calc(100% - 40px - env(safe-area-inset-top,0px));border-radius:24px 24px 0 0;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(42,33,64,.25);overflow:hidden}
+.sheet-head{padding:16px 16px 10px;display:flex;flex-direction:column;gap:10px;background:var(--surface);border-bottom:1px solid var(--line)}
+.sheet-head .top-line{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet-head h3{font-size:22px}
+.cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cats button{flex:none;min-height:34px;padding:0 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);font-size:14px;font-weight:600;color:var(--ink-2)}
+.cats button[aria-pressed="true"]{background:var(--accent-fill);border-color:var(--accent-fill);color:var(--accent-ink)}
+.pk-list{flex:1;overflow-y:auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch}
+.pk-group{margin-top:14px}
+.pk-group > b{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:0 0 6px 4px}
+.pk-rows{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.pk-row{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:0 14px 0 16px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;font-size:16px}
+.pk-rows .pk-row:first-child{border-top:0}
+.pk-row .plus{flex:none;min-width:32px;height:32px;padding:0 6px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:20px;font-weight:600;line-height:1}
+.pk-row.added .plus{background:var(--good-fill);color:var(--ink);font-size:15px}
+.pk-row.added{background:var(--good-soft)}
+.add-big{border-style:dashed;border-width:2px;background:transparent;color:var(--accent)}
+
 /* Archive */
 .search{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:0 14px}
 .exo-card{width:100%;text-align:left;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:14px 16px;border:0;border-top:1px solid var(--line);background:transparent}
@@ -335,6 +357,7 @@ details.card[open] > summary::after{content:" ▾"}
   <button type="button" data-act="rest-skip">Passer</button>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="picker" id="picker" hidden></div>
 <div class="update" id="update" hidden role="status"><span>Nouvelle version disponible</span><button type="button" class="btn primary sm" id="update-btn">Mettre à jour</button></div>
 
 <div class="tabs">
@@ -443,8 +466,20 @@ const POOL = {
        halteres:['Rowing haltère','Pull-over haltère','Oiseau haltères','Shrugs haltères','Curl marteau'],
        pdc:['Tractions','Rowing inversé','Superman','Tractions australiennes','Curl serviette']}
 };
-const TIMED = new Set(['Gainage planche','Chaise murale','Superman']);
-const COMMON_EX = [...new Set(Object.values(POOL).flatMap(p => Object.values(p).flat()))];
+const TIMED = new Set(['Gainage planche','Gainage latéral','Chaise murale','Superman']);
+const CATALOG = {
+  'Fessiers':['Hip thrust','Hip thrust machine','Pont fessier','Pont fessier unilatéral','Kickback à la poulie','Abduction machine','Fentes bulgares','Step up','Step up banc poulie','Frog pump'],
+  'Quadriceps':['Squat barre','Goblet squat','Front squat','Machine hack squat','Presse à cuisses','Leg extension','Fentes avant','Fentes arrière','Fentes marchées','Squat bulgare','Sissy squat','Chaise murale'],
+  'Ischios et lombaires':['Soulevé de terre roumain','Soulevé de terre','Leg curl assis','Leg curl allongé','Good morning','Nordic curl','Extension lombaire'],
+  'Mollets et adducteurs':['Mollets debout','Mollets assis','Mollets à la presse','Adduction machine','Squat sumo'],
+  'Pectoraux':['Développé couché','Développé couché haltères','Développé incliné','Développé incliné haltères','Écarté haltères','Écarté poulie','Pec deck','Pompes','Dips'],
+  'Dos':['Tractions','Tirage vertical','Tirage horizontal','Rowing barre','Rowing haltère','Pull-over poulie','Face pull','Rowing inversé'],
+  'Épaules':['Développé militaire','Développé épaules haltères','Élévations latérales','Élévations frontales','Oiseau haltères','Shrugs'],
+  'Bras':['Curl biceps','Curl haltères','Curl marteau','Curl pupitre','Extension triceps poulie','Extension triceps haltère','Barre au front','Dips sur banc'],
+  'Abdos et gainage':['Gainage planche','Gainage latéral','Crunchs','Relevés de jambes','Russian twists','Roue abdominale','Crunch à la poulie'],
+  'Full body et cardio':['Burpees','Kettlebell swing','Thrusters','Box jumps','Mountain climbers','Corde à sauter','Wall balls']
+};
+const COMMON_EX = [...new Set([...Object.values(CATALOG).flat(), ...Object.values(POOL).flatMap(p => Object.values(p).flat())])];
 
 const CIRCUITS = [
   {id:'hiit', name:'HIIT 20 minutes', work:40, rest:20, rounds:20, ex:['Burpees','Jumping jacks','Mountain climbers','Squats sautés','Fentes sautées']},
@@ -467,7 +502,7 @@ let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {})
 let tab = LS.get('pf.tab', 'semaine');
 if(!['semaine','programme','seance','chrono','archive','progres'].includes(tab)) tab = 'semaine';
 let chronoMode = LS.get('pf.chrono', 'repos');
-const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null};
+const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null};
 let group = [];
 const sync = {db:null, uid:null, user:null, sample:null, lastGroup:''};
 
@@ -550,7 +585,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1074,7 +1109,7 @@ function dayEditor(d, di, n){
         <label>Note<input id="de-note-${e.id}" data-p="ex" data-field="note" ${a} data-ex="${e.id}" value="${esc(e.note)}" placeholder="Conseil, réglage machine…"></label>
       </div>
     </div>`).join('') + `<div class="ed">
-      <div class="add-ex"><input id="add-ex-${d.id}" list="ex-list" placeholder="Ajouter un exercice…" autocomplete="off" aria-label="Nouvel exercice"><button type="button" class="btn" data-act="ex-new" ${a}>Ajouter</button></div>
+      <button type="button" class="btn wide add-big" data-act="pk-open" data-target="day" ${a}>+ Ajouter des exercices</button>
       <div class="row" style="gap:6px"><label style="flex:1;min-width:160px">Appliquer une méthode à tout le jour<select id="dm-${d.id}">${Object.entries(METHODS).map(([k,m]) => `<option value="${k}" ${journal.programme.method===k?'selected':''}>${m.label} (${m.reps}, repos ${fmtRest(m.rest)})</option>`).join('')}</select></label><button type="button" class="btn sm" style="align-self:flex-end;min-height:44px" data-act="day-method" ${a}>Appliquer</button></div>
     </div>`;
   }
@@ -1167,10 +1202,7 @@ function viewMuscuDraft(){
         </div>
       </article>`;
     }).join('')}
-    <div class="add-ex">
-      <input id="new-ex" list="ex-list" placeholder="Ajouter un exercice…" autocomplete="off" aria-label="Nom de l’exercice">
-      <button type="button" class="btn" data-act="dx-add">Ajouter</button>
-    </div>
+    <button type="button" class="btn wide add-big" data-act="pk-open" data-target="draft">+ Ajouter des exercices</button>
     <datalist id="ex-list">${[...known].sort((a,b)=>a.localeCompare(b,'fr')).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <label class="toggle"><input type="checkbox" id="auto-rest" data-act="auto-rest" ${settings.autoRest ? 'checked' : ''}> Lancer le repos de l’exercice quand je valide une série</label>
     ${ui.msg ? `<p class="msg">${esc(ui.msg)}</p>` : ''}
@@ -1542,6 +1574,74 @@ function viewArchive(){
     <div style="margin-top:14px">${ui.archAdd ? addForm('') : `<button type="button" class="btn wide" data-act="arch-add-open">+ Ajouter une perf passée</button>`}</div>`;
 }
 
+/* ---------- Liste d'exercices ---------- */
+const fold = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+function pickerGroups(){
+  const inCat = new Set(Object.values(CATALOG).flat().map(fold));
+  const mine = [...new Set([...journal.sessions.flatMap(s => (s.exercises||[]).map(e => e.name)), ...(journal.programme?.days || []).flatMap(d => (d.exercises||[]).map(e => e.name))])]
+    .filter(n => n && !inCat.has(fold(n))).sort((a,b) => a.localeCompare(b,'fr'));
+  const g = mine.length ? {'Mes exercices': mine} : {};
+  return Object.assign(g, CATALOG);
+}
+function openPicker(target, dayId){
+  ui.picker = {target, dayId, q:'', cat:'Tous', added:{}};
+  const box = $('#picker'); box.hidden = false; document.body.style.overflow = 'hidden';
+  box.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Ajouter des exercices">
+    <div class="sheet-head">
+      <div class="top-line"><h3>Ajouter des exercices</h3><button type="button" class="btn primary sm" data-act="pk-close">Terminé</button></div>
+      <input class="search" id="pk-q" type="search" placeholder="Chercher : hip thrust, fente…" autocomplete="off" aria-label="Chercher un exercice">
+      <div class="cats" id="pk-cats"></div>
+    </div>
+    <div class="pk-list" id="pk-list"></div>
+  </div>`;
+  renderPicker();
+}
+function renderPicker(){
+  const P = ui.picker; if(!P) return;
+  const groups = pickerGroups(), q = fold(P.q);
+  $('#pk-cats').innerHTML = ['Tous', ...Object.keys(groups)].map(c => `<button type="button" data-act="pk-cat" data-cat="${esc(c)}" aria-pressed="${P.cat === c}">${esc(c)}</button>`).join('');
+  let html = '', any = false, exact = false;
+  Object.entries(groups).forEach(([cat, names]) => {
+    if(!q && P.cat !== 'Tous' && P.cat !== cat) return;
+    const list = names.filter(n => !q || fold(n).includes(q));
+    if(!list.length) return;
+    any = true;
+    if(list.some(n => fold(n) === q)) exact = true;
+    html += `<div class="pk-group"><b>${esc(cat)}</b><div class="pk-rows">${list.map(n => {
+      const c = P.added[fold(n)] || 0;
+      return `<button type="button" class="pk-row ${c ? 'added' : ''}" data-act="pk-add" data-name="${esc(n)}"><span>${esc(n)}</span><span class="plus">${c ? (c > 1 ? '✓ ' + c : '✓') : '+'}</span></button>`;
+    }).join('')}</div></div>`;
+  });
+  if(q && !exact){
+    html = `<div class="pk-group"><div class="pk-rows"><button type="button" class="pk-row" data-act="pk-add" data-name="${esc(P.q.trim())}"><span>Créer « ${esc(P.q.trim())} »</span><span class="plus">+</span></button></div></div>` + html;
+  }
+  if(!any && !q) html = '<p class="small muted" style="padding:16px">Aucun exercice.</p>';
+  $('#pk-list').innerHTML = html;
+}
+function pickerAdd(name){
+  const P = ui.picker; if(!P || !name) return;
+  if(P.target === 'draft'){
+    if(!draft?.exercises) return;
+    draft.exercises.push(exFromName(name)); saveDraft();
+  }else{
+    const d = findDay(P.dayId); if(!d) return;
+    const m = METHODS[journal.programme.method] || METHODS.hyper;
+    d.exercises.push({id:newId(), name, sets:m.sets, reps:TIMED.has(name) ? '45 s' : m.reps, kg:'', rest:m.rest, tempo:'', note:''});
+    persistSoon();
+  }
+  P.added[fold(name)] = (P.added[fold(name)] || 0) + 1;
+  const total = Object.values(P.added).reduce((a,b) => a+b, 0);
+  toast(`${name} ajouté · ${total} au total`);
+  renderPicker();
+}
+function closePicker(){
+  if(!ui.picker) return;
+  const added = Object.values(ui.picker.added).reduce((a,b) => a+b, 0);
+  ui.picker = null; const box = $('#picker'); box.hidden = true; box.innerHTML = ''; document.body.style.overflow = '';
+  if(added) persist();
+  renderView();
+}
+
 /* ================= Actions ================= */
 function findDay(id){ return journal.programme?.days.find(d => d.id === id); }
 function startDraft(d){ draft = d; ui.confirmCancel = false; ui.msg = ''; saveDraft(); go('seance'); }
@@ -1633,6 +1733,10 @@ document.addEventListener('click', e => {
       d.exercises.forEach(x => { x.sets = m.sets; if(!/s$/.test(String(x.reps).trim())) x.reps = m.reps; x.rest = m.rest; x.tempo = m.tempo; });
       persist(); renderView(); toast(`Méthode ${m.label.toLowerCase()} appliquée`); break;
     }
+    case 'pk-open': openPicker(b.dataset.target, b.dataset.day); break;
+    case 'pk-close': closePicker(); break;
+    case 'pk-cat': ui.picker.cat = b.dataset.cat; renderPicker(); $('#pk-list').scrollTo(0,0); break;
+    case 'pk-add': pickerAdd(b.dataset.name); break;
     case 'ex-new': {
       const d = findDay(b.dataset.day), inp = document.getElementById('add-ex-' + d.id), name = inp.value.trim();
       if(!name){ inp.focus(); break; }
@@ -1757,6 +1861,7 @@ document.addEventListener('input', e => {
   else if(t.dataset.iv){
     iv[t.dataset.iv] = Math.max(t.dataset.iv === 'rest' ? 0 : 1, Math.round(+t.value || 0)); iv.names = []; iv.title = ''; ivSave(); updateDials();
   }
+  else if(t.id === 'pk-q' && ui.picker){ ui.picker.q = t.value; renderPicker(); }
   else if(t.id === 'arch-q'){ ui.archQ = t.value; const pos = t.selectionStart; renderView(); const n = $('#arch-q'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(_){} } }
   else if(t.dataset.meta === 'setting' && ui.archEx){ const k = ui.archEx; journal.exMeta[k] = Object.assign({}, journal.exMeta[k], {setting:t.value.slice(0,40)}); persistSoon(); }
   else if(t.dataset.p){
@@ -1796,7 +1901,9 @@ document.addEventListener('change', e => {
   }
   else if(t.dataset.p){ persist(); }
 });
+$('#picker').addEventListener('click', e => { if(e.target.id === 'picker') closePicker(); });
 document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && ui.picker){ closePicker(); return; }
   if(e.key !== 'Enter') return;
   if(e.target.id === 'new-ex'){ e.preventDefault(); document.querySelector('[data-act="dx-add"]')?.click(); }
   else if(e.target.id?.startsWith('add-ex-')){ e.preventDefault(); e.target.nextElementSibling?.click(); }
