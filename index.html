@@ -315,7 +315,7 @@ details.card[open] > summary::after{content:" ▾"}
 .rest-pill .t{font-family:var(--display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;min-width:52px}
 .rest-pill button{border:0;border-radius:999px;background:rgba(127,127,127,.25);color:inherit;min-height:34px;padding:0 12px;font-size:14px;font-weight:600}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
+.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
 .tabs button{border:0;background:transparent;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink-2);position:relative;padding:0}
 .tabs button[aria-current="page"]{color:var(--accent)}
 .tabs button[aria-current="page"] svg{background:var(--accent-soft);border-radius:10px;padding:2px;box-sizing:content-box;margin-block:-2px}
@@ -397,7 +397,6 @@ details.card[open] > summary::after{content:" ▾"}
     <button type="button" data-tab="semaine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>Semaine</button>
     <button type="button" data-tab="programme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Programme</button>
     <button type="button" data-tab="seance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>Séance</button>
-    <button type="button" data-tab="chrono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M18.5 6.5l1.5-1.5"/></svg>Chrono</button>
     <button type="button" data-tab="archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>Archive</button>
     <button type="button" data-tab="progres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>Progrès</button>
   </nav>
@@ -617,7 +616,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1294,6 +1293,7 @@ function viewSeance(){
     <div class="row">
       <button type="button" class="btn" data-act="free-muscu">Séance muscu libre</button>
       <button type="button" class="btn" data-act="free-cardio">Séance cardio</button>
+      <button type="button" class="btn" data-act="open-chrono" data-mode="iv">Minuteur HIIT / Tabata</button>
     </div>
     <h2 class="sec">Historique</h2>
     ${journal.sessions.length ? '' : '<p class="small muted" style="margin:-4px 0 10px">Exemple de ce que tu verras ici. Il disparaît dès ta première séance enregistrée.</p>'}
@@ -1440,7 +1440,7 @@ function viewChrono(){
     ${draft?.kind === 'cardio' ? `<button type="button" class="btn lane wide" data-act="go" data-tab="seance">Retour à ma séance cardio</button>` : ''}
     ${sw.laps.length ? `<div class="list">${sw.laps.map((l,i) => `<div class="item"><div class="t">Tour ${sw.laps.length - i}</div><div class="right num">${fmtClock(Math.floor(l.split/1000))},${Math.floor(l.split/100)%10}</div><div class="meta num">Total ${fmtClock(Math.floor(l.total/1000))}</div></div>`).join('')}</div>` : ''}`;
   }
-  return `<div class="stack">${seg}${body}</div>`;
+  return `<div class="stack"><button type="button" class="back" data-act="go" data-tab="seance">← ${draft ? 'Retour à ma séance' : 'Retour à Séance'}</button>${seg}${body}</div>`;
 }
 
 /* ---------- Progrès ---------- */
@@ -1813,6 +1813,7 @@ document.addEventListener('click', e => {
   unlockAudio();
   switch(act){
     case 'go': go(b.dataset.tab); break;
+    case 'open-chrono': chronoMode = b.dataset.mode || 'repos'; LS.set('pf.chrono', chronoMode); go('chrono'); break;
     case 'more': ui.histMore += 20; renderView(); break;
 
     /* Test */
