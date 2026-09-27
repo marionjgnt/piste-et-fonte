@@ -838,7 +838,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1520,7 +1520,21 @@ function buildProgramme(p){
       [['poly',2],['iso',2],['flex',1]].forEach(([type, nb]) => { for(let q = 0; q < nb; q++){ const alt = type === 'flex' ? 'iso' : type === 'iso' ? 'flex' : 'iso'; take(type, pool) || take(alt, pool) || take(type, groupPool) || take(alt, groupPool); } });
     }
     for(const type of ['poly','iso','flex']){ while(parts.length < 5 && take(type, groupPool)); }
-    const ordered = parts.slice(0, 5).sort((a,b) => exEnergy(b.name) - exEnergy(a.name));
+    // Règle de la maison : dès qu'une séance travaille les fessiers, le hip thrust est présent et passe en premier.
+    const HT = ['Hip thrust','Hip thrust haltère'];
+    let five = parts.slice(0, 5);
+    if(pool.includes('fessiers') && !five.some(x => HT.includes(x.name))){
+      const ht = HT.find(n => avail.some(([nm]) => nm === n));
+      if(ht){
+        const polys = five.filter(x => x.type === 'poly').sort((a,b) => exEnergy(a.name) - exEnergy(b.name));
+        const lowPolys = polys.filter(x => EXDB[x.name][0] === 'bas');
+        const out = lowPolys.find(x => (EXM[x.name] || [])[0] !== 'quadriceps') || lowPolys[0] || (focus === 'full' ? null : polys[0]);
+        if(out) five[five.indexOf(out)] = {name:ht, comp:true, type:'poly'};
+        else { const iso = [...five].reverse().find(x => x.type !== 'poly' && EXDB[x.name][0] === 'bas') || five[five.length - 1]; five[five.indexOf(iso)] = {name:ht, comp:true, type:'poly'}; }
+        five = five.slice(0, 5);
+      }
+    }
+    const ordered = five.sort((a,b) => (HT.includes(b.name) ? 1000 : exEnergy(b.name)) - (HT.includes(a.name) ? 1000 : exEnergy(a.name)));
     used[key + v] = new Set(ordered.map(x => x.name));
     const olderRest = +p.age >= 50 ? 15 : 0;
     const exercises = ordered.map((x, idx) => {
