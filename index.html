@@ -349,8 +349,8 @@ details.card[open] > summary::after{content:" ▾"}
 .rest-pill .t{font-family:var(--display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;min-width:52px}
 .rest-pill button{border:0;border-radius:999px;background:rgba(127,127,127,.25);color:inherit;min-height:34px;padding:0 12px;font-size:14px;font-weight:600}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
-.tabs button{border:0;background:transparent;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;letter-spacing:-.01em;font-weight:600;color:var(--ink-2);position:relative;padding:0}
+.tabs nav{max-width:600px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs button{border:0;background:transparent;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;letter-spacing:-.01em;line-height:1.1;text-align:center;padding:0 2px;font-weight:600;color:var(--ink-2);position:relative;padding:0}
 .tabs button[aria-current="page"]{color:var(--accent)}
 .tabs button[aria-current="page"] svg{background:var(--accent-soft);border-radius:10px;padding:2px;box-sizing:content-box;margin-block:-2px}
 .tabs button .live{position:absolute;top:10px;right:calc(50% - 18px);width:8px;height:8px;border-radius:50%;background:var(--accent)}
@@ -428,12 +428,11 @@ details.card[open] > summary::after{content:" ▾"}
 
 <div class="tabs">
   <nav id="tabs" aria-label="Sections">
-    <button type="button" data-tab="semaine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>Semaine</button>
-    <button type="button" data-tab="programme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Programme</button>
-    <button type="button" data-tab="seance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>Séance</button>
-    <button type="button" data-tab="archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>Archive</button>
+    <button type="button" data-tab="semaine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>Récap</button>
+    <button type="button" data-tab="programme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Mon programme</button>
+    <button type="button" data-tab="seance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>Faire ma séance</button>
     <button type="button" data-tab="alimentation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.5-1.8-4.5-2-6 0-2 2.6-.8 8 1.5 11 1.2 1.6 2.6 2 4.5 1 1.9 1 3.3.6 4.5-1 2.3-3 3.5-8.4 1.5-11-1.5-2-4.5-1.8-6 0z"/><path d="M12 7c0-2 1-3.5 3-4"/></svg>Alimentation</button>
-    <button type="button" data-tab="progres"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>Progrès</button>
+    <button type="button" data-tab="suivi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>Mon suivi</button>
   </nav>
 </div>
 
@@ -632,11 +631,13 @@ let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
-if(!['semaine','programme','seance','chrono','archive','progres','profil','alimentation'].includes(tab)) tab = 'semaine';
+if(!['semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
 if(profileIncomplete()) tab = 'semaine';
+if(tab === 'archive' || tab === 'progres') tab = 'suivi';
 let chronoMode = LS.get('pf.chrono', 'repos');
-const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null, archPat:'all'};
+const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'progres', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null, archPat:'all'};
 let group = [];
+{ const m = LS.get('pf.suivi', 'progres'); if(['progres','exo','seance'].includes(m)) ui.archMode = m; }
 const sync = {db:null, uid:null, user:null, sample:null, lastGroup:''};
 
 let DEMO = null;
@@ -776,7 +777,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.2.5';
+const APP_VERSION = '1.3.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1148,12 +1149,13 @@ function renderTabs(){
 function render(){ renderTabs(); renderView(); updatePill(); const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (journal.profile?.prenom || '?').trim().charAt(0).toUpperCase() || '?'; }
 function renderView(){
   const v = $('#view');
-  v.innerHTML = ({semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewArchive, profil:viewProfil, alimentation:viewAlim, progres:viewProgres}[tab] || viewSemaine)();
+  v.innerHTML = ({semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewSemaine)();
   if(tab === 'seance' && draft?.kind === 'cardio') updatePace();
-  if(tab === 'progres' || tab === 'semaine') renderGroup();
+  if(tab === 'semaine') renderGroup();
   updateDials();
 }
-function go(t){ tab = t; LS.set('pf.tab', tab); ui.msg = ''; ui.confirmDel = null; ui.confirmReset = false; render(); window.scrollTo(0,0); }
+function go(t){
+  if(t === 'progres'){ t = 'suivi'; ui.archMode = 'progres'; } else if(t === 'archive'){ t = 'suivi'; if(ui.archMode === 'progres') ui.archMode = 'exo'; } tab = t; LS.set('pf.tab', tab); ui.msg = ''; ui.confirmDel = null; ui.confirmReset = false; render(); window.scrollTo(0,0); }
 
 /* ---------- Test de départ ---------- */
 function newTest(mode){
@@ -1935,7 +1937,7 @@ function viewProgres(){
   const recs = Object.entries(best).sort((a,b) => b[1].kg - a[1].kg).slice(0,6);
   const runs = S.filter(s => s.kind === 'cardio' && ['course','tapis'].includes(s.cardio?.type) && s.cardio.km >= 5);
   const bestRun = runs.slice().sort((a,b) => a.cardio.sec/a.cardio.km - b.cardio.sec/b.cardio.km)[0];
-  return `<h1>Progrès</h1>
+  return `<h1>Mon suivi</h1>${suiviSeg()}
   ${j.demo ? '<p class="small muted" style="margin-top:6px">Données d’exemple. Tes vrais chiffres s’afficheront dès ta première séance.</p>' : ''}
   <h2 class="sec">Cette semaine</h2>
   <div class="tiles">
@@ -1944,7 +1946,7 @@ function viewProgres(){
     <div class="tile"><span class="v num">${fmtN(wk.kcal)}<small> kcal</small></span><span class="l">Calories dépensées</span></div>
     <div class="tile"><span class="v num">${fmtN(wk.km)}<small> km</small></span><span class="l">Cardio</span></div>
   </div>
-  <p class="small muted" style="margin-top:8px">Estimations : la durée réelle de ta séance quand tu la lances et la termines dans l’appli, sinon calculée exercice par exercice : répétitions × temps d’une répétition, tes pauses entre les séries et le passage d’un exercice à l’autre (détail dans Archive → Par séance). Calories calculées avec ton poids${journal.profile?.poids ? '' : ' (65 kg par défaut, renseigne le tien dans ton profil)'}.</p>
+  <p class="small muted" style="margin-top:8px">Estimations : la durée réelle de ta séance quand tu la lances et la termines dans l’appli, sinon calculée exercice par exercice : répétitions × temps d’une répétition, tes pauses entre les séries et le passage d’un exercice à l’autre (détail dans Mon suivi → Par séance). Calories calculées avec ton poids${journal.profile?.poids ? '' : ' (65 kg par défaut, renseigne le tien dans ton profil)'}.</p>
   <h2 class="sec">8 dernières semaines</h2>
   <div class="card chart">${svg}<div class="legend"><span style="--c:var(--chart-a)">Muscu et circuits</span><span style="--c:var(--chart-b)">Cardio</span></div></div>
   <h2 class="sec">Records</h2>
@@ -2083,12 +2085,18 @@ function addForm(name){
     <div class="row"><button type="button" class="btn primary" data-act="arch-save">Ajouter à l’archive</button><button type="button" class="btn ghost" data-act="arch-add-close">Fermer</button></div>
   </div>`;
 }
+function suiviSeg(){
+  const m = ui.archMode;
+  return `<div class="seg" role="group" aria-label="Affichage" style="grid-template-columns:repeat(3,1fr);margin:14px 0 4px">
+    <button type="button" data-act="arch-mode" data-mode="progres" aria-pressed="${m==='progres'}">Progrès</button>
+    <button type="button" data-act="arch-mode" data-mode="exo" aria-pressed="${m==='exo'}">Par exercice</button>
+    <button type="button" data-act="arch-mode" data-mode="seance" aria-pressed="${m==='seance'}">Par séance</button>
+  </div>`;
+}
+function viewSuivi(){ return ui.archMode === 'progres' && !ui.archEx ? viewProgres() : viewArchive(); }
 function viewArchive(){
   const A = archiveData(), idx = exerciseIndex(A.sessions);
-  const seg = `<div class="seg" role="group" aria-label="Affichage" style="grid-template-columns:1fr 1fr;margin-top:14px">
-    <button type="button" data-act="arch-mode" data-mode="exo" aria-pressed="${ui.archMode==='exo'}">Par exercice</button>
-    <button type="button" data-act="arch-mode" data-mode="seance" aria-pressed="${ui.archMode==='seance'}">Par séance</button>
-  </div>`;
+  const seg = suiviSeg();
   const demoNote = A.demo ? '<p class="small muted" style="margin-top:10px">Exemple. Ton archive se remplit toute seule à chaque séance terminée, ou avec « Ajouter une perf passée ».</p>' : '';
 
   if(ui.archEx && idx[ui.archEx]){
@@ -2155,11 +2163,11 @@ function viewArchive(){
 
   if(ui.archMode === 'seance'){
     const list = A.sessions.filter(s => s.kind === 'cardio' || (s.exercises||[]).length || s.circuit).slice().sort((a,b) => String(b.date).localeCompare(String(a.date)));
-    if(!list.length) return `<h1>Archive</h1>${seg}<div class="card" style="margin-top:14px"><p class="muted">Tes séances terminées se rangeront ici, semaine par semaine.</p></div>`;
+    if(!list.length) return `<h1>Mon suivi</h1>${seg}<div class="card" style="margin-top:14px"><p class="muted">Tes séances terminées se rangeront ici, semaine par semaine.</p></div>`;
     const first = weekStart(list[list.length-1].date).getTime();
     const weeks = [];
     list.forEach(s => { const k = weekKey(s.date); let w = weeks[weeks.length-1]; if(!w || w.k !== k){ w = {k, start:weekStart(s.date), items:[]}; weeks.push(w); } w.items.push(s); });
-    return `<h1>Archive</h1>${seg}${demoNote}
+    return `<h1>Mon suivi</h1>${seg}${demoNote}
     ${weeks.map(w => {
       const n = Math.round((w.start.getTime() - first)/(7*86400000)) + 1, end = new Date(w.start); end.setDate(end.getDate()+6);
       return `<div class="week-block"><div class="week-title"><b>Semaine ${n}</b><span class="small muted">${w.start.getDate()} ${w.start.toLocaleDateString('fr-FR',{month:'short'})} – ${end.getDate()} ${end.toLocaleDateString('fr-FR',{month:'short'})}</span></div>
@@ -2174,7 +2182,7 @@ function viewArchive(){
 
   const q = exKey(ui.archQ);
   const items = Object.values(idx).filter(it => !q || it.key.includes(q)).sort((a,b) => String(b.entries[b.entries.length-1].date).localeCompare(String(a.entries[a.entries.length-1].date)));
-  return `<h1>Archive</h1>${seg}${demoNote}
+  return `<h1>Mon suivi</h1>${seg}${demoNote}
     <input class="search" id="arch-q" type="search" placeholder="Chercher un exercice…" value="${esc(ui.archQ)}" style="margin-top:14px" aria-label="Chercher un exercice">
     <div class="list" style="margin-top:12px" id="arch-list">${items.length ? items.map(it => {
       const meta = exMetaOf(it.name), last = it.entries[it.entries.length-1], same = it.entries.filter(e => e.pat === last.pat), first = same.find(e => e.max > 0);
@@ -2460,7 +2468,7 @@ document.addEventListener('click', e => {
     case 'del-confirm': journal.sessions = journal.sessions.filter(x => x.id !== b.dataset.id); ui.confirmDel = null; persist(); renderView(); toast('Séance supprimée'); break;
 
     /* Archive */
-    case 'arch-mode': ui.archMode = b.dataset.mode; ui.archEx = null; ui.archAdd = false; renderView(); break;
+    case 'arch-mode': ui.archMode = b.dataset.mode; ui.archEx = null; ui.archAdd = false; LS.set('pf.suivi', ui.archMode); renderView(); window.scrollTo(0,0); break;
     case 'arch-open': ui.archEx = b.dataset.k; ui.archAdd = false; ui.msg = ''; ui.confirmDel = null; renderView(); window.scrollTo(0,0); break;
     case 'arch-back': ui.archEx = null; ui.archAdd = false; ui.msg = ''; renderView(); break;
     case 'arch-pat': ui.archPat = b.dataset.p; renderView(); break;
