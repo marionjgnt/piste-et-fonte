@@ -574,7 +574,9 @@ const CARDIO_TYPES = {
   marche:{label:'Marche', unit:'km'}, hiit:{label:'HIIT / corde à sauter'}, autre:{label:'Autre'}
 };
 const EQUIP = {salle:{label:'Salle de sport', sub:'Barres, machines, poulies'}, halteres:{label:'Haltères à la maison', sub:'Haltères, banc, élastiques'}, pdc:{label:'Poids du corps', sub:'Sans matériel'}};
-const DURATIONS = [30,45,60,75,90];
+const DURATIONS = [30,45,60,75,90,105,120];
+const fmtHM = m => { m = +m || 0; if(m < 60) return `${m} min`; const h = Math.floor(m/60), r = m % 60; return r ? `${h} h ${String(r).padStart(2,'0')}` : `${h} h`; };
+const cardioLabel = n => +n >= 5 ? '5+' : String(n);
 const REST_OPTS = [0,15,30,45,60,75,90,120,150,180,240,300];
 
 const POOL = {
@@ -714,7 +716,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1125,7 +1127,7 @@ function testValid(t){
     objectifs: a.goals.length > 0,
     zones: a.zones.length > 0,
     niveau: !!a.level,
-    dispo: a.days >= 1 && !!a.duration,
+    dispo: (+a.days + +a.cardioN) >= 1 && !!a.duration,
     materiel: a.equip.length > 0,
     cardio: a.cardioTypes.length > 0,
     limites: true, recap: true
@@ -1192,9 +1194,9 @@ function viewTest(){
     <div class="choices" style="margin-top:16px">${Object.entries(LEVELS).map(([k,l]) => choice('level', k, l.label, l.sub)).join('')}</div>`;
   }else if(st === 'dispo'){
     body = `<h1>Tes disponibilités</h1>
-    <h2 class="sec">Séances de muscu par semaine</h2><div class="pills">${[2,3,4,5,6].map(n => pill('days', n, n, true)).join('')}</div>
-    <h2 class="sec">Séances de cardio en plus</h2><div class="pills">${[0,1,2,3].map(n => pill('cardioN', n, n ? n : 'Aucune', true)).join('')}</div>
-    <h2 class="sec">Durée d’une séance</h2><div class="pills">${DURATIONS.map(d => pill('duration', d, d + ' min', true)).join('')}</div>`;
+    <h2 class="sec">Séances de muscu par semaine</h2><div class="pills">${[0,1,2,3,4,5,6].map(n => pill('days', n, n, true)).join('')}</div>
+    <h2 class="sec">Séances de cardio en plus</h2><div class="pills">${[0,1,2,3,4,5].map(n => pill('cardioN', n, n ? cardioLabel(n) : 'Aucune', true)).join('')}</div>
+    <h2 class="sec">Durée d’une séance</h2><div class="pills">${DURATIONS.map(d => pill('duration', d, fmtHM(d), true)).join('')}</div>`;
   }else if(st === 'materiel'){
     body = `<h1>Ton matériel</h1><p class="lead">Coche tout ce que tu as à disposition.</p>
     <div class="choices" style="margin-top:16px">${Object.entries(EQUIP2).map(([k,[l,sub]]) => multi('equip', k, l, sub)).join('')}</div>`;
@@ -1217,7 +1219,7 @@ function viewTest(){
       ${row('Quotidien', esc(QUOTIDIEN[a.quotidien]?.[0] || ''))}
       ${perso ? row('Semaine', esc(FOCUS_ORDER.filter(f => a.weekly[f]).map(f => `${a.weekly[f]}× ${FOCUS[f]}`).join(', '))) : `
       ${row('Zones', esc(a.zones.map(z => ZONES[z]).join(', ')))}
-      ${row('Semaine', esc(`${a.days} muscu${a.cardioN ? ` + ${a.cardioN} cardio` : ''} · ${a.duration} min`))}
+      ${row('Semaine', esc(`${a.days} muscu${a.cardioN ? ` + ${cardioLabel(a.cardioN)} cardio` : ''} · ${fmtHM(a.duration)}`))}
       ${row('Matériel', esc(a.equip.map(e => EQUIP2[e][0]).join(', ')))}
       ${a.cardioN ? row('Cardio', esc(a.cardioTypes.map(c => CARDIO_TYPES[c].label).join(', '))) : ''}
       ${row('Limites', esc(a.limits.filter(x => x !== 'aucune').map(l => LIMITS[l]).join(', ') || 'Aucune'))}`}
@@ -1271,8 +1273,8 @@ function buildProgramme(p){
   const lowerZ = ['fessiers','jambes'].filter(z => zones.has(z)).length, upperZ = ['dos','pecs','epaules','bras'].filter(z => zones.has(z)).length;
   const lowerFocus = lowerZ > 0 && lowerZ >= upperZ && !zones.has('global'), upperFocus = upperZ > lowerZ && !zones.has('global');
   const deb = p.level === 'debutant';
-  const n = +p.days || 3;
-  const split = n <= 2 ? ['full','full']
+  const n = p.days === undefined || p.days === '' ? 3 : +p.days;
+  const split = n <= 0 ? [] : n === 1 ? ['full'] : n === 2 ? ['full','full']
     : n === 3 ? (lowerFocus ? ['bas','haut','bas'] : upperFocus ? ['push','bas','pull'] : deb || zones.has('global') ? ['full','full','full'] : ['push','pull','bas'])
     : n === 4 ? (upperFocus ? ['haut','bas','haut','bas'] : ['bas','haut','bas','haut'])
     : n === 5 ? (lowerFocus ? ['bas','push','bas','pull','bas'] : ['push','pull','bas','haut','bas'])
@@ -1329,11 +1331,11 @@ function buildProgramme(p){
   const seen = {}; days.forEach(d => { const i = seen[d.focus] = (seen[d.focus] ?? -1) + 1; d.name = dayName(d.focus, i, counts[d.focus]); });
   const types = p.cardioTypes?.length ? p.cardioTypes : ['tapis'];
   for(let c = 0; c < (+p.cardioN || 0); c++){
-    const type = types[c % types.length], minutes = Math.min(+p.duration || 45, 45);
-    days.push({id:newId(), name: (+p.cardioN > 1 ? `Cardio ${'ABC'[c]}` : 'Cardio'), kind:'cardio', focus:'cardio', cardio:{type, minutes, format:cardioFormat(type, goal0, minutes)}});
+    const type = types[c % types.length], minutes = Math.min(+p.duration || 45, 90);
+    days.push({id:newId(), name: (+p.cardioN > 1 ? `Cardio ${'ABCDEFG'[c]}` : 'Cardio'), kind:'cardio', focus:'cardio', cardio:{type, minutes, format:cardioFormat(type, goal0, minutes)}});
   }
   const zl = [...zones].filter(z => z !== 'global').map(z => ZONES[z].toLowerCase());
-  const summary = `${split.length} séances de muscu${p.cardioN ? ` et ${p.cardioN} de cardio` : ''} par semaine, méthode ${m.label.toLowerCase()} (${m.reps} répétitions, repos ${fmtRest(m.rest)}) pour ton objectif « ${GOALS[goal0].label.toLowerCase()} ».${zl.length ? ` Accent mis sur : ${zl.join(', ')}.` : ''}${lim.size ? ` Exercices choisis pour ménager : ${[...lim].map(l => LIMITS[l].toLowerCase()).join(', ')}.` : ''}`;
+  const summary = !split.length ? `${p.cardioN} séance${p.cardioN > 1 ? 's' : ''} de cardio par semaine, en alternant ${types.map(t => CARDIO_TYPES[t].label.toLowerCase()).join(' et ')}, pour ton objectif « ${GOALS[goal0].label.toLowerCase()} ». Tu peux ajouter un jour de muscu quand tu veux.` : `${split.length ? `${split.length} séance${split.length > 1 ? 's' : ''} de muscu` : 'Pas de muscu'}${p.cardioN ? ` et ${p.cardioN} de cardio` : ''} par semaine, méthode ${m.label.toLowerCase()} (${m.reps} répétitions, repos ${fmtRest(m.rest)}) pour ton objectif « ${GOALS[goal0].label.toLowerCase()} ».${zl.length ? ` Accent mis sur : ${zl.join(', ')}.` : ''}${lim.size ? ` Exercices choisis pour ménager : ${[...lim].map(l => LIMITS[l].toLowerCase()).join(', ')}.` : ''}`;
   return {name:`Programme de ${p.prenom || 'toi'}`, source:'auto', method:methodKey, summary, days:interleave(days), createdAt:new Date().toISOString()};
 }
 
@@ -1439,7 +1441,7 @@ function viewProfil(){
     ${row('Objectifs', esc(p.goals.map(g => GOALS[g]?.label).filter(Boolean).join(', ')))}
     ${row('Zones', esc((p.zones || []).map(z => ZONES[z]).join(', ')))}
     ${row('Niveau', esc(LEVELS[p.level]?.label || ''))}
-    ${row('Semaine', esc(`${p.days} muscu${p.cardioN ? ` + ${p.cardioN} cardio` : ''} · ${p.duration} min`))}
+    ${row('Semaine', esc(`${p.days} muscu${p.cardioN ? ` + ${cardioLabel(p.cardioN)} cardio` : ''} · ${fmtHM(p.duration)}`))}
     ${row('Matériel', esc((p.equip || []).map(e => EQUIP2[e]?.[0]).join(', ')))}
     ${row('Limites', esc((p.limits || []).map(l => LIMITS[l]).join(', ') || 'Aucune'))}
   </div>
@@ -1487,10 +1489,10 @@ function viewSemaine(){
     ${ps.planned ? `<h2 class="sec">Mon plan</h2>
     <div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && next && r.day.id === next.day.id ? 'next' : ''}">
       <span class="dot">${r.done ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>' : ''}</span>
-      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)} · ${r.done.durationMin} min` : daySummary(r.day)}</div></div>
+      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)} · ${fmtHM(r.done.durationMin)}` : daySummary(r.day)}</div></div>
       ${r.done ? `<span class="chip good">Fait</span>` : `<button type="button" class="btn sm" data-act="day-start" data-id="${r.day.id}">Lancer</button>`}
     </div>`).join('')}</div>` : ''}
-    ${ps.extra.length ? `<h2 class="sec">En plus cette semaine</h2><div class="list">${ps.extra.map(s => `<div class="item"><div><div class="t">${esc(s.name)}</div><div class="d">${fmtDate(s.date)} · ${s.durationMin} min</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : 'Muscu'}</span></div>`).join('')}</div>` : ''}
+    ${ps.extra.length ? `<h2 class="sec">En plus cette semaine</h2><div class="list">${ps.extra.map(s => `<div class="item"><div><div class="t">${esc(s.name)}</div><div class="d">${fmtDate(s.date)} · ${fmtHM(s.durationMin)}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : 'Muscu'}</span></div>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:16px">
       <button type="button" class="btn" data-act="free-muscu">+ Séance muscu libre</button>
       <button type="button" class="btn" data-act="free-cardio">+ Cardio</button>
@@ -1498,7 +1500,7 @@ function viewSemaine(){
     <div class="row" style="margin-top:18px"><button type="button" class="btn sm ghost" data-act="go" data-tab="profil">Mon profil et mon bilan</button></div>`;
 }
 function daySummary(d){
-  if(d.kind === 'cardio') return `${CARDIO_TYPES[d.cardio?.type]?.label || 'Cardio'} · ${d.cardio?.minutes || '?'} min`;
+  if(d.kind === 'cardio') return `${CARDIO_TYPES[d.cardio?.type]?.label || 'Cardio'} · ${d.cardio?.minutes ? fmtHM(d.cardio.minutes) : '?'}`;
   const n = (d.exercises||[]).length;
   if(!n) return 'Aucun exercice pour l’instant';
   return `${n} exercice${n>1?'s':''} · ${esc(d.exercises.slice(0,3).map(e => e.name).join(', '))}${n>3?'…':''}`;
@@ -1567,7 +1569,7 @@ function dayCard(d){
     <button type="button" class="btn sm" data-act="day-edit" data-id="${d.id}">Modifier</button></header>`;
   let body = '';
   if(d.kind === 'cardio'){
-    body = `<div class="cardio-box"><b>${CARDIO_TYPES[d.cardio?.type]?.label || 'Cardio'}</b> · ${d.cardio?.minutes || '?'} min${d.cardio?.format ? `<p class="small muted" style="margin-top:4px">${esc(d.cardio.format)}</p>` : ''}</div>`;
+    body = `<div class="cardio-box"><b>${CARDIO_TYPES[d.cardio?.type]?.label || 'Cardio'}</b> · ${d.cardio?.minutes ? fmtHM(d.cardio.minutes) : '?'}${d.cardio?.format ? `<p class="small muted" style="margin-top:4px">${esc(d.cardio.format)}</p>` : ''}</div>`;
   }else{
     body = d.exercises.length ? `<div class="exs">${d.exercises.map(e => `<div class="exl">
         <span class="nm">${esc(e.name)}</span>
@@ -1651,10 +1653,10 @@ function sessionItem(s, demo){
     const c = s.cardio || {};
     meta = `${CARDIO_TYPES[c.type]?.label || 'Cardio'} · ${fmtClock(c.sec || 0)}${c.km ? ` · ${fmtN(c.km)} km · ${paceText(c.type, c.km, c.sec)}` : ''}${c.rpe ? ` · ressenti ${c.rpe}/10` : ''}`;
   }else if(s.circuit){
-    meta = `Circuit · ${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s · ${s.durationMin} min`;
+    meta = `Circuit · ${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s · ${fmtHM(s.durationMin)}`;
   }else{
     const nbEx = (s.exercises||[]).length, nbSets = (s.exercises||[]).reduce((a,e) => a + e.sets.length, 0), vol = volume(s);
-    meta = `${nbEx} exercice${nbEx>1?'s':''} · ${nbSets} séries${vol ? ` · ${fmtN(vol)} kg soulevés` : ''} · ${s.durationMin} min`;
+    meta = `${nbEx} exercice${nbEx>1?'s':''} · ${nbSets} séries${vol ? ` · ${fmtN(vol)} kg soulevés` : ''} · ${fmtHM(s.durationMin)}`;
   }
   const nbEx = (s.exercises||[]).length;
   return `<div class="item">
@@ -1740,7 +1742,7 @@ function viewCardioDraft(){
       <input id="draft-name" value="${esc(draft.name)}" autocomplete="off">
       <span class="small muted num" id="draft-since"></span>
     </div>
-    ${c.format ? `<div class="planned"><b>Au programme</b> · ${c.minutes ? c.minutes + ' min · ' : ''}${esc(c.format)}</div>` : ''}
+    ${c.format ? `<div class="planned"><b>Au programme</b> · ${c.minutes ? fmtHM(c.minutes) + ' · ' : ''}${esc(c.format)}</div>` : ''}
     <div class="card stack">
       <div class="field"><label for="c-type">Activité</label><select id="c-type" data-c="type">${Object.entries(CARDIO_TYPES).map(([k,v]) => `<option value="${k}" ${c.type===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
       <div class="fields">
@@ -2086,7 +2088,7 @@ function viewArchive(){
       const n = Math.round((w.start.getTime() - first)/(7*86400000)) + 1, end = new Date(w.start); end.setDate(end.getDate()+6);
       return `<div class="week-block"><div class="week-title"><b>Semaine ${n}</b><span class="small muted">${w.start.getDate()} ${w.start.toLocaleDateString('fr-FR',{month:'short'})} – ${end.getDate()} ${end.toLocaleDateString('fr-FR',{month:'short'})}</span></div>
       ${w.items.map(s => `<div class="card">
-        <div class="row" style="justify-content:space-between"><div><div style="font-weight:600">${s.manual ? 'Saisie d’archive' : esc(s.name)}</div><div class="small muted">${fmtDate(s.date)}${s.durationMin ? ` · ${s.durationMin} min` : ''}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : s.circuit ? 'Circuit' : 'Muscu'}</span></div>
+        <div class="row" style="justify-content:space-between"><div><div style="font-weight:600">${s.manual ? 'Saisie d’archive' : esc(s.name)}</div><div class="small muted">${fmtDate(s.date)}${s.durationMin ? ` · ${fmtHM(s.durationMin)}` : ''}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : s.circuit ? 'Circuit' : 'Muscu'}</span></div>
         ${(s.exercises||[]).length ? `<table class="sess-tbl" style="margin-top:8px"><tbody>${s.exercises.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${setsSummary(e.sets, exMetaOf(e.name).perSide)}</td></tr>`).join('')}</tbody></table>` : ''}
         ${s.kind === 'cardio' ? `<p class="small muted num" style="margin-top:6px">${CARDIO_TYPES[s.cardio?.type]?.label || 'Cardio'} · ${fmtClock(s.cardio?.sec || 0)}${s.cardio?.km ? ` · ${fmtN(s.cardio.km)} km` : ''}${s.cardio?.note ? ` · ${esc(s.cardio.note)}` : ''}</p>` : ''}
         ${s.circuit ? `<p class="small muted num" style="margin-top:6px">${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s</p>` : ''}
