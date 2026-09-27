@@ -1104,7 +1104,7 @@ function viewTest(){
   let body = '';
   if(st === 'prenom'){
     body = `<p class="hello">Bienvenue sur Mova</p><h1>Comment tu t’appelles&nbsp;?</h1>
-    <div class="field" style="margin-top:18px"><label for="t-prenom">Ton prénom</label><input id="t-prenom" data-ta="prenom" value="${esc(a.prenom)}" placeholder="Marion" autocomplete="given-name" style="font-size:20px"></div>
+    <div class="field" style="margin-top:18px"><label for="t-prenom">Ton prénom</label><input id="t-prenom" data-ta="prenom" value="${esc(a.prenom)}" placeholder="Ton prénom" autocomplete="given-name" style="font-size:20px"></div>
     <p class="small muted" style="margin-top:10px">Tout reste sur ton téléphone : ton profil, tes séances et tes charges ne sont partagés avec personne.</p>`;
   }else if(st === 'choix'){
     body = `<p class="hello">Enchanté${a.sexe === 'femme' ? 'e' : ''}, ${esc(a.prenom.trim())} !</p><h1>Ton programme</h1><p class="lead">Tu en as déjà un, ou on le construit ensemble ?</p>
