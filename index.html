@@ -585,12 +585,12 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if(refreshing) return; refreshing = true; location.reload(); });
-  navigator.serviceWorker.register('sw.js').then(reg => {
+  navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => {
     const offer = w => {
       const box = $('#update'); box.hidden = false;
       $('#update-btn').onclick = () => { if(draft) saveDraft(); w.postMessage('skipWaiting'); };

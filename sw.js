@@ -1,12 +1,13 @@
 // Piste & Fonte : service worker (hors connexion + mises à jour)
 // À chaque nouvelle version : changer VERSION ici ET APP_VERSION dans index.html.
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 const CACHE = 'pf-' + VERSION;
 const FONTS = 'fonts-v1';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  // cache: 'reload' force le téléchargement des nouveaux fichiers (sinon le navigateur peut resservir l'ancienne version).
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, {cache: 'reload'})))));
 });
 
 self.addEventListener('activate', e => {
