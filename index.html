@@ -533,7 +533,7 @@ let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {})
 let tab = LS.get('pf.tab', 'semaine');
 if(!['semaine','programme','seance','chrono','archive','progres'].includes(tab)) tab = 'semaine';
 let chronoMode = LS.get('pf.chrono', 'repos');
-const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null};
+const ui = {confirmCancel:false, confirmDel:null, msg:'', test:null, editDay:null, gen:null, histMore:12, confirmReset:false, archMode:'exo', archEx:null, archQ:'', archMetric:'max', archAdd:false, pendingImport:null, picker:null, archPat:'all'};
 let group = [];
 const sync = {db:null, uid:null, user:null, sample:null, lastGroup:''};
 
@@ -616,7 +616,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -807,11 +807,13 @@ function coachTip(E, k){
   if(f === 'dur' || f === 'max') return {txt:'Bien joué, tu es allé chercher tes limites. Exercice terminé !'};
   return {txt:'Exercice terminé, bravo !'};
 }
-function lastExFor(name){
+const PATTERNS = {prog:{label:'Charge progressive', short:'Progressive', color:'var(--chart-a)'}, fixe:{label:'Charge fixe', short:'Fixe', color:'var(--chart-b)'}};
+function patternOf(sets){ return new Set(sets.map(x => +x.kg || 0).filter(v => v > 0)).size > 1 ? 'prog' : 'fixe'; }
+function lastExFor(name, pat){
   const n = name.trim().toLowerCase();
   for(const s of journal.sessions){
     const ex = (s.exercises||[]).find(e => e.name.trim().toLowerCase() === n);
-    if(ex && ex.sets.length) return {date:s.date, sets:ex.sets};
+    if(ex && ex.sets.length && (!pat || patternOf(ex.sets) === pat)) return {date:s.date, sets:ex.sets};
   }
   return null;
 }
@@ -821,23 +823,20 @@ function weeklyAdvice(){
   const since = Date.now() - 28*86400000;
   journal.sessions.forEach(s => { if(new Date(s.date).getTime() >= since) (s.exercises||[]).forEach(e => { const k = e.name.trim().toLowerCase(); if(!names.has(k)) names.set(k, e.name); }); });
   const out = [];
-  names.forEach(name => {
-    const last = lastExFor(name); if(!last || new Date(last.date).getTime() < since) return;
+  names.forEach(name => ['prog','fixe'].forEach(pat => {
+    const last = lastExFor(name, pat); if(!last || new Date(last.date).getTime() < since) return;
     const ad = advice(last.sets); if(!ad) return;
     const top = Math.max(0, ...last.sets.map(x => +x.kg || 0));
-    out.push({name, last, ad, target: top && ad.delta ? top + ad.delta : null});
-  });
+    out.push({name, pat, both: hasBothPatterns(name), last, ad, target: top && ad.delta ? top + ad.delta : null});
+  }));
   const order = {up:0, down:1, keep:2};
   return out.sort((a,b) => order[a.ad.cls] - order[b.ad.cls]);
 }
-function lastSetsFor(name){
-  const n = name.trim().toLowerCase();
-  for(const s of journal.sessions){
-    const ex = (s.exercises||[]).find(e => e.name.trim().toLowerCase() === n);
-    if(ex && ex.sets.length) return ex.sets;
-  }
-  return null;
+function lastSetsFor(name, pat){
+  return (pat && lastExFor(name, pat)?.sets) || lastExFor(name)?.sets || null;
 }
+function draftPat(e){ return e.target?.plan ? 'prog' : e.target ? 'fixe' : patternOf(e.sets); }
+function hasBothPatterns(name){ return !!(lastExFor(name, 'prog') && lastExFor(name, 'fixe')); }
 const planText = plan => plan.map(p => `${p.kg !== '' && p.kg != null ? fmtN(+p.kg) + ' kg' : '–'} × ${p.reps || '?'}`).join(', ');
 const setsText = sets => sets.map(x => x.kg ? `${fmtN(x.kg)} kg × ${x.reps}` : `${x.reps} rép.`).join(', ');
 const volume = s => (s.exercises||[]).reduce((a,e) => a + e.sets.reduce((b,x) => b + (+x.reps||0)*(+x.kg||0), 0), 0);
@@ -1096,7 +1095,7 @@ function viewSemaine(){
       : next ? `<div class="hero" style="margin-top:16px"><p class="small muted" style="margin:0;text-transform:uppercase;letter-spacing:.08em">Prochaine séance</p><h1 style="margin-top:4px">${esc(next.day.name)}</h1><p class="muted">${daySummary(next.day)}</p><div class="row"><button type="button" class="btn primary" data-act="day-start" data-id="${next.day.id}">Commencer</button><button type="button" class="btn" data-act="day-view" data-id="${next.day.id}">Voir le détail</button></div></div>`
       : ps.planned ? `<div class="card" style="margin-top:16px"><h3>Semaine bouclée</h3><p class="muted small" style="margin-top:4px">Toutes les séances prévues sont faites. Récupère bien, ou ajoute une séance bonus.</p></div>` : ''}
     ${(() => { const wa = weeklyAdvice(); return wa.length ? `<h2 class="sec">Tes conseils de la semaine</h2>
-    <div class="list">${wa.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? ` · ${fmtN(w.target)} kg` : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>` : ''; })()}
+    <div class="list">${wa.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}${w.both ? ` <span class="chip" style="margin-left:4px">${PATTERNS[w.pat].short}</span>` : ''}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? ` · ${fmtN(w.target)} kg` : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>` : ''; })()}
     ${ps.planned ? `<h2 class="sec">Mon plan</h2>
     <div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && next && r.day.id === next.day.id ? 'next' : ''}">
       <span class="dot">${r.done ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>' : ''}</span>
@@ -1309,7 +1308,7 @@ function viewMuscuDraft(){
       <span class="small muted num" id="draft-since"></span>
     </div>
     ${draft.exercises.map((e,i) => {
-      const prev = lastSetsFor(e.name), t = e.target;
+      const prev = lastSetsFor(e.name, draftPat(e)), t = e.target;
       return `<article class="ex">
         <header><h3>${esc(e.name)}</h3><button type="button" class="btn sm ghost" data-act="dx-remove" data-ex="${i}">Retirer</button></header>
         ${exMetaOf(e.name).setting ? `<p class="small" style="margin:2px 0 0"><span class="chip">Réglage : ${esc(exMetaOf(e.name).setting)}</span></p>` : ''}
@@ -1326,7 +1325,7 @@ function viewMuscuDraft(){
           <button type="button" class="btn sm" data-act="set-add" data-ex="${i}">+ Série</button>
           ${e.sets.length > 1 ? `<button type="button" class="btn sm ghost" data-act="set-del" data-ex="${i}">− Série</button>` : ''}
         </div>
-        ${prev ? (() => { const ad = advice(prev), ft = feelText(prev); return `<div class="last num"><span>La dernière fois : <b>${esc(setsText(prev))}</b></span>${ft ? `<i>${esc(ft)}</i>` : ''}${ad ? `<span class="advice ${ad.cls}">${ad.txt}</span>` : ''}${ad && ad.delta ? `<button type="button" class="btn sm ${ad.delta > 0 ? 'primary' : ''}" style="align-self:flex-start;margin-top:4px" data-act="apply-adv" data-ex="${i}" data-d="${ad.delta}">${ad.delta > 0 ? 'Mettre' : 'Passer à'} ${esc(fmtN(Math.max(0, ...prev.map(x => +x.kg || 0)) + ad.delta))} kg</button>` : ''}</div>`; })() : ''}
+        ${prev ? (() => { const ad = advice(prev), ft = feelText(prev); return `<div class="last num"><span>La dernière fois${hasBothPatterns(e.name) ? ` (${PATTERNS[draftPat(e)].label.toLowerCase()})` : ''} : <b>${esc(setsText(prev))}</b></span>${ft ? `<i>${esc(ft)}</i>` : ''}${ad ? `<span class="advice ${ad.cls}">${ad.txt}</span>` : ''}${ad && ad.delta ? `<button type="button" class="btn sm ${ad.delta > 0 ? 'primary' : ''}" style="align-self:flex-start;margin-top:4px" data-act="apply-adv" data-ex="${i}" data-d="${ad.delta}">${ad.delta > 0 ? 'Mettre' : 'Passer à'} ${esc(fmtN(Math.max(0, ...prev.map(x => +x.kg || 0)) + ad.delta))} kg</button>` : ''}</div>`; })() : ''}
       </article>`;
     }).join('')}
     <button type="button" class="btn wide add-big" data-act="pk-open" data-target="draft">+ Ajouter des exercices</button>
@@ -1540,7 +1539,7 @@ function exerciseIndex(sessions){
     if(!e.sets?.length) return;
     const k = exKey(e.name);
     const it = idx[k] ||= {key:k, name:e.name, entries:[]};
-    it.entries.push({date:s.date, sid:s.id, sets:e.sets, manual:!!s.manual,
+    it.entries.push({date:s.date, sid:s.id, sets:e.sets, manual:!!s.manual, pat:patternOf(e.sets),
       max: Math.max(0, ...e.sets.map(x => +x.kg || 0)), vol: e.sets.reduce((a,x) => a + (+x.reps||0)*(+x.kg||0), 0)});
   }));
   Object.values(idx).forEach(it => { it.entries.sort((a,b) => String(a.date).localeCompare(String(b.date))); it.name = it.entries[it.entries.length-1] ? (sessions.flatMap(s => s.exercises||[]).find(e => exKey(e.name) === it.key)?.name || it.name) : it.name; });
@@ -1565,32 +1564,38 @@ function sparkline(vals){
   return `<svg viewBox="0 0 92 30" aria-hidden="true"><polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--chart-a)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="var(--chart-a)"/></svg>`;
 }
 function niceStep(range){ const raw = range / 4, p = Math.pow(10, Math.floor(Math.log10(raw || 1))); return [1,2,2.5,5,10].map(m => m*p).find(x => x >= raw) || 10*p; }
-function lineChart(points, unit){
-  if(!points.length) return '';
-  const W = 340, H = 200, L = 36, R = 14, T = 16, B = 26;
-  const t0 = new Date(points[0].date).getTime(), t1 = new Date(points[points.length-1].date).getTime();
-  const vals = points.map(p => p.v), vmin = Math.min(...vals), vmax = Math.max(...vals);
+function lineChart(series, unit){
+  series = series.filter(sr => sr.pts.length);
+  if(!series.length) return '';
+  const W = 340, H = 200, L = 36, R = 14, T = 18, B = 26;
+  const all = series.flatMap(sr => sr.pts);
+  const times = all.map(p => new Date(p.date).getTime()), t0 = Math.min(...times), t1 = Math.max(...times);
+  const vals = all.map(p => p.v), vmin = Math.min(...vals), vmax = Math.max(...vals);
   const step = niceStep(Math.max(vmax - vmin, vmax*0.2, 1));
   const lo = Math.max(0, Math.floor((vmin - step*0.5)/step)*step), hi = Math.ceil((vmax + step*0.3)/step)*step;
   const x = t => t1 === t0 ? (L + (W-R))/2 : L + (t - t0)/(t1 - t0)*(W - L - R);
   const y = v => T + (1 - (v - lo)/(hi - lo || 1))*(H - T - B);
   const ticks = []; for(let v = lo; v <= hi + 1e-9; v += step) ticks.push(Math.round(v*100)/100);
-  const pts = points.map(p => [x(new Date(p.date).getTime()), y(p.v)]);
-  const line = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
-  const area = pts.length > 1 ? `<polygon points="${pts[0][0].toFixed(1)},${H-B} ${line} ${pts[pts.length-1][0].toFixed(1)},${H-B}" fill="var(--accent-soft)" opacity=".8"/>` : '';
-  const lastP = pts[pts.length-1];
-  const mid = Math.floor((points.length-1)/2);
-  const labelIdx = [...new Set([0, points.length-1])];
-  if(pts[mid][0] - pts[0][0] > 60 && lastP[0] - pts[mid][0] > 60) labelIdx.splice(1, 0, mid);
+  const one = series.length === 1;
+  const body = series.map(sr => {
+    const pts = sr.pts.map(p => [x(new Date(p.date).getTime()), y(p.v)]);
+    const line = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+    const area = one && pts.length > 1 ? `<polygon points="${pts[0][0].toFixed(1)},${H-B} ${line} ${pts[pts.length-1][0].toFixed(1)},${H-B}" fill="var(--accent-soft)" opacity=".8"/>` : '';
+    const lp = pts[pts.length-1];
+    return `${area}<polyline points="${line}" fill="none" stroke="${sr.color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+      ${pts.map((p,i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === pts.length-1 ? 5 : 3.2}" fill="${i === pts.length-1 ? sr.color : 'var(--surface)'}" stroke="${sr.color}" stroke-width="2"/>`).join('')}
+      <text x="${Math.min(lp[0], W-R-2)}" y="${Math.max(12, lp[1]-10)}" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">${fmtN(sr.pts[sr.pts.length-1].v)} ${unit}</text>`;
+  }).join('');
+  const d0 = all.find(p => new Date(p.date).getTime() === t0).date, d1 = all.find(p => new Date(p.date).getTime() === t1).date;
+  const xl = t1 === t0 ? [[x(t0), d0, 'middle']] : [[x(t0), d0, 'start'], [x(t1), d1, 'end']];
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution de la charge">
     ${ticks.map(v => `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="var(--ink-2)">${fmtN(v)}</text>`).join('')}
-    ${area}
-    <polyline points="${line}" fill="none" stroke="var(--chart-a)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-    ${pts.map((p,i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === pts.length-1 ? 5 : 3.2}" fill="${i === pts.length-1 ? 'var(--chart-a)' : 'var(--surface)'}" stroke="var(--chart-a)" stroke-width="2"/>`).join('')}
-    <text x="${Math.min(lastP[0], W-R-2)}" y="${Math.max(12, lastP[1]-10)}" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">${fmtN(points[points.length-1].v)} ${unit}</text>
-    ${labelIdx.map(i => `<text x="${pts[i][0]}" y="${H-8}" text-anchor="${i === 0 && pts.length > 1 ? 'start' : i === points.length-1 && pts.length > 1 ? 'end' : 'middle'}" font-size="10" fill="var(--ink-2)">${shortDate(points[i].date).slice(0,5)}</text>`).join('')}
-  </svg>`;
+    ${body}
+    ${xl.map(([xx, d, a]) => `<text x="${xx}" y="${H-8}" text-anchor="${a}" font-size="10" fill="var(--ink-2)">${shortDate(d).slice(0,5)}</text>`).join('')}
+  </svg>
+  ${one ? '' : `<div class="legend">${series.map(sr => `<span style="--c:${sr.color}">${sr.label}</span>`).join('')}</div>`}`;
 }
+
 function archiveData(){
   const real = journal.sessions.filter(s => s.kind !== 'cardio');
   return real.some(s => (s.exercises||[]).length) ? {sessions:journal.sessions, demo:false} : {sessions:shownSessions().sessions, demo:!journal.sessions.length};
@@ -1623,16 +1628,30 @@ function viewArchive(){
   if(ui.archEx && idx[ui.archEx]){
     const it = idx[ui.archEx], meta = exMetaOf(it.name), unit = meta.perSide ? 'kg/côté' : 'kg';
     const metric = ui.archMetric;
-    const pts = it.entries.filter(e => metric === 'vol' ? e.vol > 0 : e.max > 0).map(e => ({date:e.date, v: metric === 'vol' ? e.vol : e.max}));
-    const first = it.entries.find(e => e.max > 0), last = [...it.entries].reverse().find(e => e.max > 0);
-    const rec = it.entries.reduce((a,e) => e.max > (a?.max||0) ? e : a, null);
-    const diff = first && last ? last.max - first.max : 0;
-    const desc = [...it.entries].reverse();
+    const present = ['prog','fixe'].filter(pt => it.entries.some(e => e.pat === pt));
+    const both = present.length > 1;
+    const filt = both && present.includes(ui.archPat) ? ui.archPat : 'all';
+    const shownPats = filt === 'all' ? present : [filt];
+    const series = shownPats.map(pt => ({color: both ? PATTERNS[pt].color : 'var(--chart-a)', label: PATTERNS[pt].label,
+      pts: it.entries.filter(e => e.pat === pt && (metric === 'vol' ? e.vol > 0 : e.max > 0)).map(e => ({date:e.date, v: metric === 'vol' ? e.vol : e.max}))}));
+    const statsFor = pt => {
+      const es = it.entries.filter(e => e.pat === pt && e.max > 0);
+      const first = es[0], last = es[es.length-1], rec = es.reduce((a,e) => e.max > (a?.max||0) ? e : a, null);
+      const diff = first && last ? last.max - first.max : 0;
+      return `${both ? `<h3 style="font-size:17px;margin:14px 0 6px;display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:3px;background:${PATTERNS[pt].color};display:inline-block"></span>${PATTERNS[pt].label}</h3>` : ''}
+      <div class="arch-stats" style="margin-top:${both ? 0 : 12}px">
+        <div class="tile"><span class="v num" style="font-size:24px">${first ? fmtN(first.max) : '–'}</span><span class="l">Départ · ${first ? shortDate(first.date).slice(0,5) : ''}</span></div>
+        <div class="tile"><span class="v num" style="font-size:24px">${last ? fmtN(last.max) : '–'}</span><span class="l">Actuel</span></div>
+        <div class="tile"><span class="v num" style="font-size:24px;color:${diff > 0 ? 'var(--good)' : diff < 0 ? 'var(--danger)' : 'var(--ink)'}">${diff > 0 ? '+' : ''}${fmtN(diff)}</span><span class="l">Progression (${unit})</span></div>
+        <div class="tile"><span class="v num" style="font-size:24px">${rec ? fmtN(rec.max) : '–'}</span><span class="l">Record</span></div>
+      </div>`;
+    };
+    const desc = [...it.entries].filter(e => filt === 'all' || e.pat === filt).reverse();
     let rows = '';
     desc.forEach((e,i) => {
       const prev = desc[i+1];
       const fb = feelText(e.sets);
-      rows += `<div class="entry"><span class="dt">${shortDate(e.date)}</span><span class="w num">${setsSummary(e.sets, meta.perSide)}</span>
+      rows += `<div class="entry"><span class="dt">${shortDate(e.date)}</span><span class="w num">${both ? `<span class="chip" style="margin-right:6px;${e.pat === 'prog' ? 'background:var(--accent-soft);color:var(--accent)' : 'background:var(--lane-soft);color:var(--lane)'}">${PATTERNS[e.pat].short}</span>` : ''}${setsSummary(e.sets, meta.perSide)}</span>
         ${A.demo ? '' : (ui.confirmDel === 'ae:' + e.sid ? `<button type="button" class="btn sm danger" data-act="arch-del-ok" data-sid="${e.sid}">Confirmer</button>` : `<button type="button" class="btn icon ghost" data-act="arch-del" data-sid="${e.sid}" aria-label="Supprimer cette ligne">✕</button>`)}
         ${fb ? `<span class="fb">${esc(fb)}</span>` : ''}</div>`;
       if(prev){
@@ -1648,20 +1667,20 @@ function viewArchive(){
           <label class="toggle" style="flex:1 1 140px;align-self:flex-end;min-height:46px"><input type="checkbox" id="am-side" data-meta="perSide" ${meta.perSide ? 'checked' : ''} ${A.demo ? 'disabled' : ''}> Charge par côté</label>
         </div>
       </div>
-      <div class="arch-stats" style="margin-top:12px">
-        <div class="tile"><span class="v num" style="font-size:24px">${first ? fmtN(first.max) : '–'}</span><span class="l">Départ · ${first ? shortDate(first.date).slice(0,5) : ''}</span></div>
-        <div class="tile"><span class="v num" style="font-size:24px">${last ? fmtN(last.max) : '–'}</span><span class="l">Actuel</span></div>
-        <div class="tile"><span class="v num" style="font-size:24px;color:${diff > 0 ? 'var(--good)' : diff < 0 ? 'var(--danger)' : 'var(--ink)'}">${diff > 0 ? '+' : ''}${fmtN(diff)}</span><span class="l">Progression (${unit})</span></div>
-        <div class="tile"><span class="v num" style="font-size:24px">${rec ? fmtN(rec.max) : '–'}</span><span class="l">Record</span></div>
-      </div>
+      ${both ? `<div class="seg" role="group" aria-label="Type de séance" style="grid-template-columns:repeat(3,1fr);margin-top:14px">
+        <button type="button" data-act="arch-pat" data-p="all" aria-pressed="${filt==='all'}">Les deux</button>
+        <button type="button" data-act="arch-pat" data-p="prog" aria-pressed="${filt==='prog'}">Progressive</button>
+        <button type="button" data-act="arch-pat" data-p="fixe" aria-pressed="${filt==='fixe'}">Fixe</button>
+      </div>` : ''}
+      ${shownPats.map(statsFor).join('')}
       <h2 class="sec">Évolution</h2>
       <div class="card chart">
         <div class="seg" role="group" aria-label="Mesure" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
           <button type="button" data-act="arch-metric" data-m="max" aria-pressed="${metric==='max'}">Charge max</button>
           <button type="button" data-act="arch-metric" data-m="vol" aria-pressed="${metric==='vol'}">Volume</button>
         </div>
-        ${pts.length ? lineChart(pts, metric === 'vol' ? 'kg' : unit) : '<p class="small muted">Pas encore de charge enregistrée pour cet exercice.</p>'}
-        <p class="small muted" style="margin-top:6px">${metric === 'vol' ? 'Volume = séries × répétitions × charge. Il monte aussi quand tu ajoutes des répétitions à charge égale.' : 'La charge la plus lourde utilisée à chaque séance.'}</p>
+        ${series.some(sr => sr.pts.length) ? lineChart(series, metric === 'vol' ? 'kg' : unit) : '<p class="small muted">Pas encore de charge enregistrée pour cet exercice.</p>'}
+        <p class="small muted" style="margin-top:6px">${metric === 'vol' ? 'Volume = séries × répétitions × charge. Il monte aussi quand tu ajoutes des répétitions à charge égale.' : (both ? 'La charge la plus lourde de chaque séance. Tes séances à charge progressive et à charge fixe sont suivies séparément, pour comparer ce qui est comparable.' : 'La charge la plus lourde utilisée à chaque séance.')}</p>
       </div>
       <h2 class="sec">Historique</h2>
       <div class="list">${rows || '<div class="empty">Rien pour l’instant.</div>'}</div>
@@ -1692,11 +1711,11 @@ function viewArchive(){
   return `<h1>Archive</h1>${seg}${demoNote}
     <input class="search" id="arch-q" type="search" placeholder="Chercher un exercice…" value="${esc(ui.archQ)}" style="margin-top:14px" aria-label="Chercher un exercice">
     <div class="list" style="margin-top:12px" id="arch-list">${items.length ? items.map(it => {
-      const meta = exMetaOf(it.name), last = it.entries[it.entries.length-1], first = it.entries.find(e => e.max > 0);
+      const meta = exMetaOf(it.name), last = it.entries[it.entries.length-1], same = it.entries.filter(e => e.pat === last.pat), first = same.find(e => e.max > 0);
       const diff = first && last.max ? last.max - first.max : 0;
       return `<button type="button" class="exo-card" data-act="arch-open" data-k="${esc(it.key)}">
         <span class="nm">${esc(it.name)}${meta.setting ? ` <span class="chip">${esc(meta.setting)}</span>` : ''}</span>
-        ${sparkline(it.entries.filter(e => e.max > 0).map(e => e.max))}
+        ${sparkline(same.filter(e => e.max > 0).map(e => e.max))}
         <span class="d num">${last.max ? `${fmtN(last.max)} kg${meta.perSide ? ' / côté' : ''}` : 'Poids du corps'} · ${shortDate(last.date)} · ${it.entries.length} séance${it.entries.length>1?'s':''}${diff > 0 ? ` · <b style="color:var(--good)">+${fmtN(diff)} kg</b>` : ''}</span>
       </button>`;
     }).join('') : '<div class="empty">Aucun exercice trouvé.</div>'}</div>
@@ -1781,8 +1800,8 @@ function startFromDay(day){
     return;
   }
   startDraft({kind:'muscu', dayId:day.id, name:day.name, startedAt:Date.now(), exercises: day.exercises.map(e => {
-    const prev = lastSetsFor(e.name);
     const plan = e.varied && e.perSet?.length ? e.perSet : null;
+    const prev = lastSetsFor(e.name, plan ? 'prog' : 'fixe');
     const timed = /s$/.test(String(e.reps).trim());
     const reps = timed ? '' : (parseInt(e.reps) || '');
     const n = plan ? plan.length : (e.sets || 3);
@@ -1907,7 +1926,7 @@ document.addEventListener('click', e => {
     case 'coach-next': { const nx = draft.exercises[ex]?.sets[st+1]; if(!nx) break; nx.kg = String(Math.max(0, Math.round(+b.dataset.kg*100)/100)); saveDraft(); renderView(); toast(`Série ${st+2} : ${fmtN(+nx.kg)} kg`); break; }
     case 'coach-extra': { const E = draft.exercises[ex]; if(!E) break; E.sets.push({reps:b.dataset.reps || '', kg:+b.dataset.kg ? String(Math.round(+b.dataset.kg*100)/100) : '', done:false}); saveDraft(); renderView(); document.getElementById(`r-${ex}-${E.sets.length-1}`)?.scrollIntoView({block:'center'}); toast('Série bonus ajoutée, allez !'); break; }
     case 'apply-adv': {
-      const E = draft.exercises[ex], prev = lastSetsFor(E.name), dlt = +b.dataset.d; if(!prev) break;
+      const E = draft.exercises[ex], prev = lastSetsFor(E.name, draftPat(E)), dlt = +b.dataset.d; if(!prev) break;
       E.sets.forEach((x, k) => { const base = +(prev[Math.min(k, prev.length-1)]?.kg) || 0; if(base) x.kg = String(Math.max(0, Math.round((base + dlt)*100)/100)); });
       saveDraft(); renderView(); toast(dlt > 0 ? `Charges augmentées de ${fmtN(dlt)} kg` : `Charges baissées de ${fmtN(-dlt)} kg`); break;
     }
@@ -1946,6 +1965,7 @@ document.addEventListener('click', e => {
     case 'arch-mode': ui.archMode = b.dataset.mode; ui.archEx = null; ui.archAdd = false; renderView(); break;
     case 'arch-open': ui.archEx = b.dataset.k; ui.archAdd = false; ui.msg = ''; ui.confirmDel = null; renderView(); window.scrollTo(0,0); break;
     case 'arch-back': ui.archEx = null; ui.archAdd = false; ui.msg = ''; renderView(); break;
+    case 'arch-pat': ui.archPat = b.dataset.p; renderView(); break;
     case 'arch-metric': ui.archMetric = b.dataset.m; renderView(); break;
     case 'arch-add-open': ui.archAdd = true; ui.msg = ''; renderView(); document.getElementById('arch-add')?.scrollIntoView({block:'center'}); (document.getElementById('aa-name')?.value ? document.getElementById('aa-kg') : document.getElementById('aa-name'))?.focus(); break;
     case 'arch-add-close': ui.archAdd = false; ui.msg = ''; renderView(); break;
