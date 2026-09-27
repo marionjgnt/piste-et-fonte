@@ -558,7 +558,10 @@ const EXDB = {
   'Curl marteau':['pull',['bras'],['halteres','kettlebell'],[],0],
   'Écarté poulie':['push',['pecs'],['salle'],[],0],
   'Élévations frontales':['push',['epaules'],['halteres','salle'],[],0],
-  'Pompes diamant':['push',['bras','pecs'],ALLEQ,['poignets'],1]
+  'Pompes diamant':['push',['bras','pecs'],ALLEQ,['poignets'],1],
+  'Écarté haltères':['push',['pecs'],['halteres','salle'],['epaules'],0],
+  'Pull-over haltère':['pull',['dos'],['halteres','salle'],['epaules'],0],
+  'Pull-over poulie':['pull',['dos'],['salle'],[],0]
 };
 // Muscles travaillés par exercice (le premier est le muscle principal), pour les séances ciblées.
 const EXM = {
@@ -567,13 +570,24 @@ const EXM = {
   'Fentes bulgares':['fessiers','quadriceps'], 'Fentes arrière':['fessiers','quadriceps'], 'Step up':['quadriceps','fessiers'], 'Leg curl assis':['ischios'], 'Leg curl allongé':['ischios'], 'Leg extension':['quadriceps'],
   'Abduction machine':['fessiers'], 'Kickback à la poulie':['fessiers'], 'Abduction élastique':['fessiers'], 'Kettlebell swing':['fessiers','ischios'], 'Mollets debout':['mollets'], 'Mollets assis':['mollets'], 'Mollets sur marche':['mollets'],
   'Squat sumo':['adducteurs','fessiers','quadriceps'], 'Adduction machine':['adducteurs'], 'Good morning':['ischios','fessiers'], 'Nordic curl':['ischios'],
-  'Développé couché':['pecs','triceps'], 'Développé couché haltères':['pecs','triceps'], 'Développé incliné haltères':['pecs','epaules'], 'Pompes':['pecs','triceps'], 'Pompes diamant':['triceps','pecs'], 'Pec deck':['pecs'], 'Écarté poulie':['pecs'], 'Dips':['triceps','pecs'],
+  'Développé couché':['pecs','triceps'], 'Développé couché haltères':['pecs','triceps'], 'Développé incliné haltères':['pecs','epaules'], 'Pompes':['pecs','triceps'], 'Pompes diamant':['triceps','pecs'], 'Pec deck':['pecs'], 'Écarté poulie':['pecs'], 'Écarté haltères':['pecs'], 'Pull-over haltère':['dos'], 'Pull-over poulie':['dos'], 'Dips':['triceps','pecs'],
   'Développé militaire':['epaules','triceps'], 'Développé épaules haltères':['epaules','triceps'], 'Élévations latérales':['epaules'], 'Élévations frontales':['epaules'], 'Oiseau haltères':['epaules','dos'], 'Face pull':['epaules','dos'],
   'Extension triceps poulie':['triceps'], 'Extension triceps haltère':['triceps'],
   'Tractions':['dos','biceps'], 'Tirage vertical':['dos','biceps'], 'Rowing haltère':['dos','biceps'], 'Rowing barre':['dos','biceps'], 'Tirage horizontal':['dos','biceps'], 'Rowing élastique':['dos'], 'Rowing inversé':['dos','biceps'], 'Superman':['dos'],
   'Curl biceps':['biceps'], 'Curl haltères':['biceps'], 'Curl élastique':['biceps'], 'Curl marteau':['biceps'],
   'Gainage planche':['abdos'], 'Gainage latéral':['abdos'], 'Dead bug':['abdos'], 'Relevés de jambes':['abdos'], 'Crunch à la poulie':['abdos'], 'Russian twists':['abdos']
 };
+// Flexion / extension : une seule articulation qui plie ou se tend (genou, coude, cheville, bas du dos).
+const FLEX = new Set(['Leg curl assis','Leg curl allongé','Leg extension','Nordic curl','Extension lombaire','Superman','Mollets debout','Mollets assis','Mollets sur marche','Curl biceps','Curl haltères','Curl élastique','Curl marteau','Extension triceps poulie','Extension triceps haltère']);
+const exType = name => EXDB[name]?.[4] ? 'poly' : FLEX.has(name) ? 'flex' : 'iso';
+// Énergie demandée : sert à ordonner la séance (le plus coûteux en premier).
+const HEAVY_POLY = ['Squat barre','Soulevé de terre roumain','Soulevé de terre roumain haltères','Machine hack squat','Presse à cuisses','Good morning','Squat sumo','Développé couché','Développé militaire','Tractions','Rowing barre','Dips','Fentes bulgares','Hip thrust','Hip thrust haltère','Goblet squat','Kettlebell swing'];
+function exEnergy(name){
+  const t = exType(name), i = HEAVY_POLY.indexOf(name);
+  if(t === 'poly') return 100 - (i >= 0 ? i : 40) + (EXDB[name][0] === 'bas' ? 5 : 0);
+  if(t === 'iso') return EXDB[name][0] === 'core' ? 20 : 30;
+  return 10;
+}
 const SPLIT_TYPES = {full:['Full body','Tout le corps dans la même séance'], haut:['Haut du corps complet','Plusieurs muscles : pecs, dos, épaules, bras'], bas:['Bas du corps complet','Plusieurs muscles : fessiers, quadriceps, ischios, mollets'], hautC:['Haut du corps ciblé','2 à 3 muscles au choix'], basC:['Bas du corps ciblé','2 à 3 muscles au choix']};
 const SPLIT_ORDER = ['full','haut','bas','hautC','basC'];
 const HAUT_M = {pecs:'Pectoraux', dos:'Dos', epaules:'Épaules', biceps:'Biceps', triceps:'Triceps', abdos:'Abdos'};
@@ -650,8 +664,8 @@ const CATALOG = {
   'Quadriceps':['Squat barre','Goblet squat','Front squat','Machine hack squat','Presse à cuisses','Leg extension','Fentes avant','Fentes arrière','Fentes marchées','Squat bulgare','Sissy squat','Chaise murale'],
   'Ischios et lombaires':['Soulevé de terre roumain','Soulevé de terre','Leg curl assis','Leg curl allongé','Good morning','Nordic curl','Extension lombaire'],
   'Mollets et adducteurs':['Mollets debout','Mollets assis','Mollets à la presse','Adduction machine','Squat sumo'],
-  'Pectoraux':['Développé couché','Développé couché haltères','Développé incliné','Développé incliné haltères','Écarté haltères','Écarté poulie','Pec deck','Pompes','Dips'],
-  'Dos':['Tractions','Tirage vertical','Tirage horizontal','Rowing barre','Rowing haltère','Rowing élastique','Superman','Pull-over poulie','Face pull','Rowing inversé'],
+  'Pectoraux':['Développé couché','Développé couché haltères','Écarté haltères','Développé incliné','Développé incliné haltères','Écarté haltères','Écarté poulie','Pec deck','Pompes','Dips'],
+  'Dos':['Tractions','Tirage vertical','Pull-over haltère','Tirage horizontal','Rowing barre','Rowing haltère','Rowing élastique','Superman','Pull-over poulie','Face pull','Rowing inversé'],
   'Épaules':['Développé militaire','Développé épaules haltères','Élévations latérales','Élévations frontales','Oiseau haltères','Shrugs'],
   'Bras':['Curl biceps','Curl haltères','Curl élastique','Curl marteau','Curl pupitre','Extension triceps poulie','Extension triceps haltère','Barre au front','Dips sur banc'],
   'Abdos et gainage':['Gainage planche','Gainage latéral','Dead bug','Crunchs','Relevés de jambes','Russian twists','Roue abdominale','Crunch à la poulie'],
@@ -824,7 +838,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1473,33 +1487,45 @@ function buildProgramme(p){
     const focus = item.focus;
     const key = item.muscles ? 'c:' + item.muscles.join('+') : focus;
     const v = variants[key] = (variants[key] ?? -1) + 1;
-    if(item.muscles){
-      const taken = new Set(), parts = [];
-      const SMALL = ['mollets','adducteurs','abdos'];
-      const small = item.muscles.filter(m => SMALL.includes(m)), big = item.muscles.filter(m => !SMALL.includes(m));
-      const smallN = Math.min(2, Math.max(1, Math.round(nEx / item.muscles.length)));
-      const bigN = big.length ? Math.max(2, Math.round((nEx - small.length * smallN) / big.length)) : 0;
-      [...big, ...small].forEach(mu => { const got = pickMuscle(mu, SMALL.includes(mu) ? smallN : bigN, key, v, taken); got.forEach(x => { taken.add(x.name); parts.push(x); }); });
-      item.parts = parts;
+    // Toujours 5 exercices : 2 polyarticulaires, 2 isolations, 1 flexion/extension, dans les muscles de la séance.
+    const POOLS = {bas:['fessiers','quadriceps','ischios','mollets','adducteurs'], haut:['pecs','dos','epaules','triceps','biceps'], full:['quadriceps','fessiers','dos','pecs','ischios','epaules','abdos'], push:['pecs','epaules','triceps'], pull:['dos','biceps','epaules']};
+    const zmap = {fessiers:['fessiers'], jambes:['quadriceps','ischios'], dos:['dos'], pecs:['pecs'], epaules:['epaules'], bras:['triceps','biceps'], abdos:['abdos']};
+    const groupPool = POOLS[focus] || POOLS.full;
+    const prio = [...new Set([...zones].flatMap(z => zmap[z] || []))].filter(mu => groupPool.includes(mu));
+    const pool = item.muscles ? [...item.muscles] : [...prio, ...groupPool.filter(mu => !prio.includes(mu))];
+    const prevUsed = used[key + (v - 1)] || new Set();
+    const taken = new Set(), primCount = {}, parts = [];
+    const score = (name, pl) => {
+      const ms = EXM[name] || [], idx = pl.indexOf(ms[0]);
+      let sc = idx >= 0 ? (pl.length - idx) * 2 + 3 : ms.some(mu => pl.includes(mu)) ? 1 : -99;
+      sc -= (primCount[ms[0]] || 0) * 3;
+      if(prevUsed.has(name)) sc -= 4;
+      if(eq.has('salle') && ['Squat','Superman','Mollets sur marche','Pont fessier'].includes(name)) sc -= 3;
+      if(deb && ['Squat barre','Soulevé de terre roumain','Développé militaire','Tractions','Dips','Rowing barre','Good morning','Nordic curl'].includes(name)) sc -= 1;
+      if((p.notes || '').toLowerCase().includes(name.toLowerCase())) sc += 2;
+      return sc;
+    };
+    const take = (type, pl) => {
+      const best = avail.filter(([nm]) => !taken.has(nm) && exType(nm) === type).map(([nm]) => ({name:nm, sc:score(nm, pl)})).filter(x => x.sc > -50).sort((a,b) => b.sc - a.sc)[0];
+      if(!best) return false;
+      taken.add(best.name); const pm = (EXM[best.name] || [])[0]; primCount[pm] = (primCount[pm] || 0) + 1;
+      parts.push({name:best.name, comp: exType(best.name) === 'poly', type}); return true;
+    };
+    if(focus === 'full' && !item.muscles){
+      // Full body : un exercice du bas et un du haut pour chaque type.
+      const low = pool.filter(mu => ['quadriceps','fessiers','ischios'].includes(mu)), up = pool.filter(mu => ['dos','pecs','epaules'].includes(mu));
+      [['poly', low], ['poly', up], ['iso', low], ['iso', up]].forEach(([type, pl]) => { take(type, pl) || take(type === 'iso' ? 'flex' : 'iso', pl) || take(type, groupPool); });
+      take('flex', pool) || take('iso', pool);
+    }else{
+      [['poly',2],['iso',2],['flex',1]].forEach(([type, nb]) => { for(let q = 0; q < nb; q++){ const alt = type === 'flex' ? 'iso' : type === 'iso' ? 'flex' : 'iso'; take(type, pool) || take(alt, pool) || take(type, groupPool) || take(alt, groupPool); } });
     }
-    const core = zones.has('abdos') || focus === 'full' ? 1 : 0;
-    const k = nEx - core;
-    let parts = item.parts || [];
-    if(!parts.length && ['bas','haut','full'].includes(focus)) parts = completeParts(focus, k, key, v);
-    if(parts.length) {}
-    else if(focus === 'bas') parts = pick('bas', k, focus, v);
-    else if(focus === 'push') parts = pick('push', k, focus, v);
-    else if(focus === 'pull') parts = pick('pull', k, focus, v);
-    else if(focus === 'haut'){ const a = Math.ceil(k/2); const P = pick('push', a, focus, v), Q = pick('pull', k - a, focus, v); for(let i = 0; i < Math.max(P.length, Q.length); i++){ if(P[i]) parts.push(P[i]); if(Q[i]) parts.push(Q[i]); } }
-    else { const nb = lowerFocus ? Math.ceil(k/2) : Math.round(k/3); const B = pick('bas', nb, focus, v), P = pick('push', Math.ceil((k-nb)/2), focus, v), Q = pick('pull', k - nb - Math.ceil((k-nb)/2), focus, v); parts = [...B, ...P, ...Q]; }
-    if(core && !item.muscles) parts.push(...pick('core', 1, focus + 'core', v));
-    const comp = parts.filter(x => x.comp && EXDB[x.name][0] !== 'core'), iso = parts.filter(x => !x.comp && EXDB[x.name][0] !== 'core'), cr = parts.filter(x => EXDB[x.name][0] === 'core');
-    const ordered = [...comp, ...iso, ...cr];
+    for(const type of ['poly','iso','flex']){ while(parts.length < 5 && take(type, groupPool)); }
+    const ordered = parts.slice(0, 5).sort((a,b) => exEnergy(b.name) - exEnergy(a.name));
     used[key + v] = new Set(ordered.map(x => x.name));
     const olderRest = +p.age >= 50 ? 15 : 0;
     const exercises = ordered.map((x, idx) => {
       const timed = TIMED.has(x.name);
-      const sets = Math.max(2, (x.comp ? m.sets : Math.min(m.sets, 3)) - (deb ? 1 : 0));
+      const sets = Math.max(2, (x.comp ? m.sets : Math.min(m.sets, 3)) - (deb ? 1 : 0) - (+p.duration <= 30 ? 1 : 0));
       const reps = timed ? '30-45 s' : x.comp ? m.reps : (methodKey === 'force' ? '8-10' : methodKey === 'hyper' ? '10-12' : m.reps);
       const rest = Math.max(30, (x.comp ? m.rest + (methodKey === 'hyper' ? 30 : 0) : m.rest - 15) + olderRest);
       const ex = {id:newId(), name:x.name, sets, reps, kg:'', rest, tempo:m.tempo, note:''};
