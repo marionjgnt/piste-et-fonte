@@ -279,6 +279,25 @@ details.card[open] > summary::after{content:" ▾"}
 .food:first-child{border-top:0}
 .food .q{font-size:13px;color:var(--ink-2)}
 .food .pr{font-family:var(--display);font-size:20px;font-weight:600;grid-row:1/3;grid-column:2;align-self:center}
+.wk{margin-top:14px}
+.wk-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.wk-top b{font-family:var(--num);font-size:26px;font-weight:700}
+.wk .plan{margin-top:10px}
+.wk .plan-row{padding:10px 14px}
+.wk .plan-row .dot{width:28px;height:28px}
+.group-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin:16px 0 8px}
+.group-title i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.alert{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:12px 16px;border-top:1px solid var(--line)}
+.alert:first-child{border-top:0}
+.alert .ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:var(--peach-soft);color:var(--accent)}
+.alert p{font-size:14px;color:var(--ink-2)}
+.win{display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px;border-top:1px solid var(--line)}
+.win:first-child{border-top:0}
+.win b.num{color:var(--good);font-family:var(--num);font-size:20px}
+.streak{display:flex;gap:6px;margin-top:10px}
+.streak span{flex:1;height:34px;border-radius:10px;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--ink-2)}
+.streak span.ok{background:var(--good-fill);color:var(--ink)}
+.streak span.part{background:var(--peach-soft);color:var(--ink)}
 .squares{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
 .sq{position:relative;min-height:180px;border:0;border-radius:24px;padding:16px;text-align:left;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);color:var(--ink);min-width:0}
 .sq svg{width:30px;height:30px;flex:none}
@@ -725,7 +744,7 @@ let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
-if(!['activite','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
+if(!['activite','conseils','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
 tab = tab === 'alimentation' ? 'alimentation' : 'activite';
 if(profileIncomplete()) tab = 'semaine';
 if(tab === 'archive' || tab === 'progres') tab = 'suivi';
@@ -872,7 +891,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.6.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1246,8 +1265,8 @@ function renderTabs(){
 function render(){ renderTabs(); renderView(); updatePill(); const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (journal.profile?.prenom || '?').trim().charAt(0).toUpperCase() || '?'; }
 function renderView(){
   const v = $('#view');
-  v.innerHTML = ({activite:viewActivite, semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewActivite)();
-  if(['semaine','programme','seance','suivi'].includes(tab) && !ui.test) v.insertAdjacentHTML('afterbegin', `<button type="button" class="back" data-act="go" data-tab="activite" style="margin-bottom:6px">← Mon activité</button>`);
+  v.innerHTML = ({activite:viewActivite, conseils:viewConseils, semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewActivite)();
+  if(['semaine','programme','seance','suivi','conseils'].includes(tab) && !ui.test) v.insertAdjacentHTML('afterbegin', `<button type="button" class="back" data-act="go" data-tab="activite" style="margin-bottom:6px">← Mon activité</button>`);
   if(tab === 'seance' && draft?.kind === 'cardio') updatePace();
   if(tab === 'semaine') renderGroup();
   updateDials();
@@ -1714,18 +1733,117 @@ function viewProfil(){
   : `<div class="card stack"><p>Fais le bilan complet (5 min) : objectifs, zones à travailler, niveau, matériel, blessures. Je te crée un programme adapté.</p><button type="button" class="btn primary" data-act="bilan-start">Faire mon bilan</button></div>`}`;
 }
 
-const SQ_ICONS = {semaine:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>`,programme:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,seance:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>`,suivi:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>`};
-const ACTIVITY_TABS = ['activite','semaine','programme','seance','suivi','chrono','archive','progres'];
+const SQ_ICONS = {conseils:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>`,semaine:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 15l2.5 2.5L16 13"/></svg>`,programme:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,seance:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M6.5 7v10M17.5 7v10M21 10v4M6.5 12h11"/></svg>`,suivi:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V13M10 20V8M16 20v-9M22 20H2"/><path d="M4 9l6-4 6 3 5-4"/></svg>`};
+const ACTIVITY_TABS = ['activite','conseils','semaine','programme','seance','suivi','chrono','archive','progres'];
+function weekBlock(){
+  const P = journal.programme, ps = planStatus();
+  const now = new Date(), ws = weekStart(now), we = new Date(ws); we.setDate(we.getDate()+6);
+  const range = `${ws.getDate()} ${ws.toLocaleDateString('fr-FR',{month:'short'})} – ${we.getDate()} ${we.toLocaleDateString('fr-FR',{month:'short'})}`;
+  if(!P || !P.days.length) return `<div class="card stack wk"><p><b>Pas encore de programme.</b> Saisis le tien ou fais-en créer un pour suivre ta semaine ici.</p><button type="button" class="btn sm primary" data-act="go" data-tab="programme" style="align-self:flex-start">Mon programme</button></div>`;
+  const next = ps.rows.find(r => !r.done);
+  const check = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>';
+  return `<section class="wk">
+    ${draft ? `<div class="card row" style="justify-content:space-between;margin-bottom:10px;background:var(--accent-soft)"><div><div style="font-weight:700">${esc(draft.name)}</div><div class="small muted">Séance en cours</div></div><button type="button" class="btn sm primary" data-act="go" data-tab="seance">Reprendre</button></div>` : ''}
+    <div class="wk-top"><span class="small muted" style="text-transform:uppercase;letter-spacing:.08em">Semaine du ${range}</span><b class="num">${ps.done} / ${ps.planned}</b></div>
+    <div class="meter" style="margin-top:8px">${ps.rows.map(r => `<span class="${r.done ? 'on' : ''} ${r.day.kind === 'cardio' ? 'c' : ''}"></span>`).join('')}</div>
+    ${next ? `<div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && r === next ? 'next' : ''}">
+      <span class="dot">${r.done ? check : ''}</span>
+      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)}` : r === next ? 'Prochaine séance' : 'À faire'}</div></div>
+      ${r.done ? '<span class="chip good">Fait</span>' : `<button type="button" class="btn sm ${r === next && !draft ? 'primary' : ''}" data-act="day-start" data-id="${r.day.id}">Lancer</button>`}
+    </div>`).join('')}</div>`
+    : `<div class="card" style="margin-top:10px"><h3>Semaine bouclée !</h3><p class="small muted" style="margin-top:4px">Toutes tes séances prévues sont faites. Récupère bien.</p></div>`}
+  </section>`;
+}
 function viewActivite(){
   const p = journal.profile || {};
   const sq = (t, cls, title, phrase, extra = '') => `<button type="button" class="sq ${cls}" data-act="go" data-tab="${t}">${SQ_ICONS[t]}${extra}<b>${title}</b><span class="p">${phrase}</span></button>`;
   return `${p.prenom ? `<p class="hello">Salut ${esc(p.prenom)} !</p>` : ''}<h1>Mon activité</h1>
+  ${weekBlock()}
   <div class="squares">
-    ${sq('semaine', 's1', 'Récap', 'Ta semaine en un coup d’œil : séances faites, prochaine séance et conseils pour progresser.')}
+    ${sq('conseils', 's1', 'Conseils', 'Exercice par exercice : ce que tu peux augmenter et ce qu’il vaut mieux garder cette semaine.')}
     ${sq('programme', 's2', 'Programme', 'Retrouve ici ton programme détaillé, que tu peux modifier quand tu le souhaites.')}
     ${sq('seance', 's3', 'Séance', 'Suis ton programme étape par étape, avec ton chrono de repos et ton coach.', draft ? '<span class="live-tag">En cours</span>' : '')}
     ${sq('suivi', 's4', 'Suivi', 'Tes courbes, tes records et l’historique de toutes tes séances.')}
   </div>`;
+}
+
+/* ---------- Conseils ---------- */
+function progressWins(){
+  const idx = exerciseIndex(journal.sessions.filter(s => s.kind !== 'cardio')), since = Date.now() - 28*86400000, wins = [];
+  Object.values(idx).forEach(it => ['prog','fixe'].forEach(pat => {
+    const es = it.entries.filter(e => e.pat === pat && e.max > 0);
+    if(es.length < 2) return;
+    const last = es[es.length-1]; if(new Date(last.date).getTime() < since) return;
+    const inWin = es.filter(e => new Date(e.date).getTime() >= since), before = es.filter(e => new Date(e.date).getTime() < since);
+    const ref = before.length ? before[before.length-1] : inWin[0];
+    const diff = last.max - ref.max; if(diff <= 0) return;
+    const weeks = Math.max(1, Math.round((new Date(last.date) - new Date(ref.date)) / (7*86400000)));
+    wins.push({name:it.name, pat, diff, weeks, both: es.length !== it.entries.filter(e => e.max > 0).length});
+  }));
+  return wins.sort((a,b) => b.diff - a.diff).slice(0, 5);
+}
+function watchAlerts(){
+  const idx = exerciseIndex(journal.sessions.filter(s => s.kind !== 'cardio')), out = [], now = Date.now();
+  Object.values(idx).forEach(it => ['prog','fixe'].forEach(pat => {
+    const es = it.entries.filter(e => e.pat === pat);
+    const l4 = es.slice(-4);
+    const lastHard = l4.length && l4[l4.length-1].sets.some(x => x.feel === 'max');
+    if(l4.length === 4 && !lastHard && l4.every(e => e.max > 0 && e.max === l4[0].max)) out.push({ic:'=', t:`${it.name} : même charge depuis 4 séances`, d:`Tu es à ${fmtN(l4[0].max)} kg. Essaie d’abord de faire 1 à 2 répétitions de plus par série, puis augmente la charge.`});
+    const l3 = es.slice(-3);
+    if(l3.length === 3 && l3.every(e => e.sets.some(x => x.feel === 'max'))) out.push({ic:'!', t:`${it.name} : très dur 3 fois de suite`, d:'Baisse un peu la charge pendant une semaine (environ −10 %) pour mieux récupérer, puis remonte.'});
+  }));
+  const names = new Set((journal.programme?.days || []).flatMap(d => (d.exercises || []).map(e => e.name.trim().toLowerCase())));
+  Object.values(idx).forEach(it => {
+    if(!names.has(it.key)) return;
+    const last = it.entries[it.entries.length-1], days = Math.floor((now - new Date(last.date)) / 86400000);
+    if(days >= 21) out.push({ic:'?', t:`${it.name} : pas fait depuis ${Math.floor(days/7)} semaines`, d:'Il est dans ton programme mais tu ne l’as pas noté récemment. Pense à le reprendre, ou retire-le de ton programme.'});
+  });
+  return out;
+}
+function regularity(){
+  const planned = journal.programme?.days?.length || 0, now = new Date();
+  const weeks = [];
+  for(let k = 4; k >= 1; k--){ const d = weekStart(now); d.setDate(d.getDate() - 7*k); weeks.push({d, n: weekStats(journal.sessions, weekKey(d)).total}); }
+  let streak = 0;
+  for(let k = 1; k <= 52 && planned; k++){ const d = weekStart(now); d.setDate(d.getDate() - 7*k); if(weekStats(journal.sessions, weekKey(d)).total >= planned) streak++; else break; }
+  if(planned && weekStats(journal.sessions, weekKey(now)).total >= planned) streak++;
+  const done = weeks.reduce((a,w) => a + Math.min(w.n, planned || w.n), 0);
+  return {planned, weeks, streak, done, total: planned * 4};
+}
+function viewConseils(){
+  const wa = weeklyAdvice(), wins = progressWins(), alerts = watchAlerts(), rg = regularity(), ps = planStatus();
+  const groups = [['up','À augmenter','var(--good)'], ['keep','À garder','var(--chart-a)'], ['down','À alléger','var(--peach)']];
+  const advHTML = wa.length ? groups.map(([cls, label, col]) => {
+    const list = wa.filter(w => w.ad.cls === cls); if(!list.length) return '';
+    return `<div class="group-title"><i style="background:${col}"></i>${label} <span class="small muted">(${list.length})</span></div>
+    <div class="list">${list.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}${w.both ? ` <span class="chip" style="margin-left:4px">${PATTERNS[w.pat].short}</span>` : ''}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? (w.pat === 'prog' ? ` · ${w.ad.delta > 0 ? '+' : '−'}${fmtN(Math.abs(w.ad.delta))} kg par série` : ` · ${fmtN(w.target)} kg`) : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>`;
+  }).join('') : `<div class="card"><p class="small muted">Note ton ressenti (Facile, Moyen, Dur, Très dur) après tes séries : je te dirai ici quoi augmenter et quoi garder.</p></div>`;
+  return `<h1>Conseils</h1>
+  <p class="lead">Calculés à partir de tes charges et de ton ressenti.</p>
+  <h2 class="sec">Cette semaine, exercice par exercice</h2>
+  ${advHTML}
+  <h2 class="sec">Tes progrès récents</h2>
+  ${wins.length ? `<div class="list">${wins.map(w => `<div class="win"><span><b style="font-weight:600">${esc(w.name)}</b>${w.both ? ` <span class="chip">${PATTERNS[w.pat].short}</span>` : ''}</span><span class="small muted"><b class="num">+${fmtN(w.diff)} kg</b> en ${w.weeks} semaine${w.weeks > 1 ? 's' : ''}</span></div>`).join('')}</div>`
+    : `<div class="card"><p class="small muted">Tes progressions des 4 dernières semaines apparaîtront ici.</p></div>`}
+  <h2 class="sec">À surveiller</h2>
+  ${alerts.length ? `<div class="list">${alerts.map(a => `<div class="alert"><span class="ic">${a.ic}</span><div><b>${esc(a.t)}</b><p>${esc(a.d)}</p></div></div>`).join('')}</div>`
+    : `<div class="card"><p class="small muted">Rien à signaler : tout avance bien.</p></div>`}
+  <h2 class="sec">Ta régularité</h2>
+  <div class="card">
+    ${rg.planned ? `<p><b class="num">${rg.streak}</b> semaine${rg.streak > 1 ? 's' : ''} d’affilée avec toutes tes séances faites${rg.streak >= 2 ? ' 🔥' : ''}</p>
+    <p class="small muted num" style="margin-top:4px">4 dernières semaines : ${rg.done} séances sur ${rg.total} prévues</p>
+    <div class="streak">${rg.weeks.map(w => `<span class="${w.n >= rg.planned ? 'ok' : w.n ? 'part' : ''}">${w.d.getDate()}/${w.d.getMonth()+1} · ${w.n}/${rg.planned}</span>`).join('')}</div>` : '<p class="small muted">Crée ton programme pour suivre ta régularité.</p>'}
+    ${ps.extra.length ? `<p class="small" style="margin-top:12px"><b>En plus cette semaine :</b> ${esc(ps.extra.map(x => x.name).join(', '))}</p>` : ''}
+  </div>
+  <details class="card" style="margin-top:14px"><summary>Comment je décide</summary>
+    <ul class="small muted" style="margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+      <li><b>Surtout facile, aucun dur</b> → augmente (+2,5 kg, ou +5 kg au-dessus de 60 kg).</li>
+      <li><b>Surtout moyen</b>, ou <b>au moins un dur</b> → garde la même charge encore une semaine.</li>
+      <li><b>La moitié des séries ou plus en très dur</b> → allège un peu (−2,5 kg).</li>
+      <li><b>Même charge depuis 4 séances</b> → ajoute 1 à 2 répétitions avant d’augmenter.</li>
+      <li>Tes séances en <b>charge progressive</b> et en <b>charge fixe</b> sont comparées séparément.</li>
+    </ul>
+  </details>`;
 }
 
 /* ---------- Semaine ---------- */
@@ -1764,7 +1882,7 @@ function viewSemaine(){
       : next ? `<div class="hero" style="margin-top:16px"><p class="small muted" style="margin:0;text-transform:uppercase;letter-spacing:.08em">Prochaine séance</p><h1 style="margin-top:4px">${esc(next.day.name)}</h1><p class="muted">${daySummary(next.day)}</p><div class="row"><button type="button" class="btn primary" data-act="day-start" data-id="${next.day.id}">Commencer</button><button type="button" class="btn" data-act="day-view" data-id="${next.day.id}">Voir le détail</button></div></div>`
       : ps.planned ? `<div class="card" style="margin-top:16px"><h3>Semaine bouclée</h3><p class="muted small" style="margin-top:4px">Toutes les séances prévues sont faites. Récupère bien, ou ajoute une séance bonus.</p></div>` : ''}
     ${(() => { const wa = weeklyAdvice(); return wa.length ? `<h2 class="sec">Tes conseils de la semaine</h2>
-    <div class="list">${wa.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}${w.both ? ` <span class="chip" style="margin-left:4px">${PATTERNS[w.pat].short}</span>` : ''}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? ` · ${fmtN(w.target)} kg` : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>` : ''; })()}
+    <div class="list">${wa.map(w => `<div class="adv-row"><span class="t" style="font-weight:600">${esc(w.name)}${w.both ? ` <span class="chip" style="margin-left:4px">${PATTERNS[w.pat].short}</span>` : ''}</span><span class="verdict ${w.ad.cls}">${w.ad.kind}${w.target ? (w.pat === 'prog' ? ` · ${w.ad.delta > 0 ? '+' : '−'}${fmtN(Math.abs(w.ad.delta))} kg par série` : ` · ${fmtN(w.target)} kg`) : ''}</span><span class="d num">${fmtDate(w.last.date)} : ${esc(setsText(w.last.sets))} · ${esc(w.last.sets.map(x => x.feel ? FEELS[x.feel].toLowerCase() : '–').join(', '))}</span></div>`).join('')}</div>` : ''; })()}
     ${ps.planned ? `<h2 class="sec">Mon plan</h2>
     <div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && next && r.day.id === next.day.id ? 'next' : ''}">
       <span class="dot">${r.done ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>' : ''}</span>
@@ -2679,7 +2797,7 @@ document.addEventListener('click', e => {
       if(!exercises.length){ ui.msg = 'Remplis au moins une série (nombre de répétitions) avant d’enregistrer.'; renderView(); break; }
       journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin: +draft.dur || Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), ...(+draft.dur ? {durSet:true} : {}), exercises});
       journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
-      draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('semaine');
+      draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('activite');
       break;
     }
     case 'finish-cardio': {
@@ -2688,7 +2806,7 @@ document.addEventListener('click', e => {
       const out = {type:c.type, sec}; if(km > 0 && CARDIO_TYPES[c.type]?.unit) out.km = Math.round(km*100)/100; if(c.rpe) out.rpe = +c.rpe; if(c.note.trim()) out.note = c.note.trim().slice(0,300);
       journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'cardio', dayId:draft.dayId || null, name:draft.name.trim() || 'Cardio', durationMin:Math.max(1, Math.round(sec/60)), cardio:out});
       journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
-      draft = null; saveDraft(); persist(); toast(`Séance enregistrée${out.km ? ' · ' + paceText(out.type, out.km, sec) : ''}`); go('semaine');
+      draft = null; saveDraft(); persist(); toast(`Séance enregistrée${out.km ? ' · ' + paceText(out.type, out.km, sec) : ''}`); go('activite');
       break;
     }
     case 'rpe': draft.cardio.rpe = +b.dataset.v; saveDraft(); renderView(); break;
