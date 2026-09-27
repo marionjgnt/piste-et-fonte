@@ -191,6 +191,14 @@ textarea{width:100%;min-height:90px;border-radius:12px;border:1px solid var(--li
 .ed .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .ed .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .ed label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+.ed label.toggle{flex-direction:row;align-items:center;gap:10px;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink);min-height:40px}
+.ps{display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border-radius:14px;padding:10px}
+.ps-row{display:grid;grid-template-columns:46px 1fr 1fr;gap:6px;align-items:center}
+.ps-row.head{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);text-align:center}
+.ps-row .n{font-family:var(--display);font-size:20px;font-weight:600;text-align:center;color:var(--ink-2)}
+.ps-row input{text-align:center;background:var(--surface)!important}
+.ps-step{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--ink-2)}
+.ps-step input{width:70px!important;text-align:center;background:var(--surface)!important}
 .ed label input,.ed label select,.ed label textarea{font-size:16px;text-transform:none;letter-spacing:0;color:var(--ink)}
 @media (max-width:400px){.ed .grid4{grid-template-columns:repeat(2,1fr)}.ed .grid2{grid-template-columns:1fr}}
 .gen{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 16px;text-align:center}
@@ -585,7 +593,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -729,6 +737,7 @@ function lastSetsFor(name){
   }
   return null;
 }
+const planText = plan => plan.map(p => `${p.kg !== '' && p.kg != null ? fmtN(+p.kg) + ' kg' : '–'} × ${p.reps || '?'}`).join(', ');
 const setsText = sets => sets.map(x => x.kg ? `${x.reps}×${fmtN(x.kg)}` : `${x.reps}`).join(', ');
 const volume = s => (s.exercises||[]).reduce((a,e) => a + e.sets.reduce((b,x) => b + (+x.reps||0)*(+x.kg||0), 0), 0);
 
@@ -1072,7 +1081,7 @@ function dayCard(d){
   }else{
     body = d.exercises.length ? `<div class="exs">${d.exercises.map(e => `<div class="exl">
         <span class="nm">${esc(e.name)}</span>
-        <span class="spec num"><b>${e.sets} × ${esc(e.reps)}</b>${e.kg !== '' && e.kg != null ? ` · ${fmtN(+e.kg)} kg` : ''} · repos <b>${fmtRest(e.rest)}</b>${e.tempo ? ` · ${esc(e.tempo)}` : ''}</span>
+        <span class="spec num">${e.varied && e.perSet?.length ? `<b>${e.perSet.length} séries</b> : ${esc(planText(e.perSet))}` : `<b>${e.sets} × ${esc(e.reps)}</b>${e.kg !== '' && e.kg != null ? ` · ${fmtN(+e.kg)} kg` : ''}`} · repos <b>${fmtRest(e.rest)}</b>${e.tempo ? ` · ${esc(e.tempo)}` : ''}</span>
         ${e.note ? `<span class="nt">${esc(e.note)}</span>` : ''}
       </div>`).join('')}</div>` : `<div class="empty" style="border-top:1px solid var(--line)">Aucun exercice. Appuie sur Modifier pour les ajouter.</div>`;
   }
@@ -1098,12 +1107,25 @@ function dayEditor(d, di, n){
         <button type="button" class="btn icon" data-act="ex-move" ${a} data-ex="${e.id}" data-d="1" aria-label="Descendre" ${i === d.exercises.length-1 ? 'disabled' : ''}>↓</button>
         <button type="button" class="btn icon danger" data-act="ex-del" ${a} data-ex="${e.id}" aria-label="Supprimer l’exercice">✕</button>
       </div>
-      <div class="grid4">
+      <label class="toggle"><input type="checkbox" id="de-same-${e.id}" data-p="ex" data-field="same" ${a} data-ex="${e.id}" ${e.varied ? '' : 'checked'}> Même charge à chaque série</label>
+      ${e.varied ? `<div class="ps">
+        <div class="ps-row head"><span>Série</span><span>Charge (kg)</span><span>Répét.</span></div>
+        ${(e.perSet || []).map((p,k) => `<div class="ps-row"><span class="n">${k+1}</span>
+          <input id="ps-kg-${e.id}-${k}" type="number" inputmode="decimal" min="0" step="0.5" data-p="set" data-field="kg" data-i="${k}" ${a} data-ex="${e.id}" value="${esc(p.kg)}" placeholder="–" aria-label="Charge série ${k+1}">
+          <input id="ps-reps-${e.id}-${k}" data-p="set" data-field="reps" data-i="${k}" ${a} data-ex="${e.id}" value="${esc(p.reps)}" placeholder="10" inputmode="numeric" aria-label="Répétitions série ${k+1}">
+        </div>`).join('')}
+        <div class="row" style="gap:6px">
+          <button type="button" class="btn sm" data-act="ps-add" ${a} data-ex="${e.id}" ${(e.perSet||[]).length >= 10 ? 'disabled' : ''}>+ Série</button>
+          ${(e.perSet||[]).length > 1 ? `<button type="button" class="btn sm ghost" data-act="ps-del" ${a} data-ex="${e.id}">− Série</button>` : ''}
+        </div>
+        <div class="ps-step">Remplir : +<input id="ps-step-${e.id}" type="number" inputmode="decimal" step="0.5" value="5" aria-label="Kilos à ajouter à chaque série"> kg à chaque série <button type="button" class="btn sm" data-act="ps-fill" ${a} data-ex="${e.id}">Appliquer</button></div>
+      </div>
+      <div class="grid2"><label>Repos${restSelect('de-rest-'+e.id, e.rest, `data-p="ex" data-field="rest" ${a} data-ex="${e.id}"`)}</label><span></span></div>` : `<div class="grid4">
         <label>Séries<input id="de-sets-${e.id}" type="number" inputmode="numeric" min="1" max="10" data-p="ex" data-field="sets" ${a} data-ex="${e.id}" value="${esc(e.sets)}"></label>
         <label>Répét.<input id="de-reps-${e.id}" data-p="ex" data-field="reps" ${a} data-ex="${e.id}" value="${esc(e.reps)}" placeholder="8-10"></label>
         <label>Charge kg<input id="de-kg-${e.id}" type="number" inputmode="decimal" min="0" step="0.5" data-p="ex" data-field="kg" ${a} data-ex="${e.id}" value="${esc(e.kg)}" placeholder="–"></label>
         <label>Repos${restSelect('de-rest-'+e.id, e.rest, `data-p="ex" data-field="rest" ${a} data-ex="${e.id}"`)}</label>
-      </div>
+      </div>`}
       <div class="grid2">
         <label>Tempo<input id="de-tempo-${e.id}" data-p="ex" data-field="tempo" ${a} data-ex="${e.id}" value="${esc(e.tempo)}" placeholder="Ex. : 3 s en descente"></label>
         <label>Note<input id="de-note-${e.id}" data-p="ex" data-field="note" ${a} data-ex="${e.id}" value="${esc(e.note)}" placeholder="Conseil, réglage machine…"></label>
@@ -1187,7 +1209,7 @@ function viewMuscuDraft(){
       return `<article class="ex">
         <header><h3>${esc(e.name)}</h3><button type="button" class="btn sm ghost" data-act="dx-remove" data-ex="${i}">Retirer</button></header>
         ${exMetaOf(e.name).setting ? `<p class="small" style="margin:2px 0 0"><span class="chip">Réglage : ${esc(exMetaOf(e.name).setting)}</span></p>` : ''}
-        <p class="target num">${t ? `Objectif <b>${t.sets} × ${esc(t.reps)}</b> · ` : ''}repos <b>${fmtRest(e.rest ?? settings.rest)}</b>${t?.tempo ? ` · ${esc(t.tempo)}` : ''}${t?.note ? `<br><i>${esc(t.note)}</i>` : ''}</p>
+        <p class="target num">${t ? (t.plan ? `Objectif <b>${esc(planText(t.plan))}</b> · ` : `Objectif <b>${t.sets} × ${esc(t.reps)}</b> · `) : ''}repos <b>${fmtRest(e.rest ?? settings.rest)}</b>${t?.tempo ? ` · ${esc(t.tempo)}` : ''}${t?.note ? `<br><i>${esc(t.note)}</i>` : ''}</p>
         <div class="set-row head"><span>Série</span><span>Répét.</span><span>${exMetaOf(e.name).perSide ? 'kg / côté' : 'Charge (kg)'}</span><span></span></div>
         ${e.sets.map((s,k) => `<div class="set-row${s.done ? ' done' : ''}">
           <span class="n">${k+1}</span>
@@ -1653,10 +1675,16 @@ function startFromDay(day){
   }
   startDraft({kind:'muscu', dayId:day.id, name:day.name, startedAt:Date.now(), exercises: day.exercises.map(e => {
     const prev = lastSetsFor(e.name);
-    const kg = e.kg !== '' && e.kg != null ? e.kg : (prev ? prev[prev.length-1].kg || '' : '');
+    const plan = e.varied && e.perSet?.length ? e.perSet : null;
     const timed = /s$/.test(String(e.reps).trim());
     const reps = timed ? '' : (parseInt(e.reps) || '');
-    return {name:e.name, rest:e.rest, target:{sets:e.sets, reps:e.reps, tempo:e.tempo, note:e.note}, sets:Array.from({length:e.sets || 3}, () => ({reps, kg, done:false}))};
+    const n = plan ? plan.length : (e.sets || 3);
+    const sets = Array.from({length:n}, (_, i) => {
+      const pl = plan?.[i], pv = prev?.[Math.min(i, (prev?.length || 1) - 1)];
+      const kg = pl && pl.kg !== '' && pl.kg != null ? pl.kg : (!plan && e.kg !== '' && e.kg != null ? e.kg : (pv ? pv.kg || '' : ''));
+      return {reps: pl ? (parseInt(pl.reps) || '') : reps, kg, done:false};
+    });
+    return {name:e.name, rest:e.rest, target:{sets:n, reps:e.reps, plan, tempo:e.tempo, note:e.note}, sets};
   })});
 }
 function exFromName(name){
@@ -1732,6 +1760,20 @@ document.addEventListener('click', e => {
       const d = findDay(b.dataset.day), k = document.getElementById('dm-' + d.id)?.value, m = METHODS[k]; if(!d || !m) break;
       d.exercises.forEach(x => { x.sets = m.sets; if(!/s$/.test(String(x.reps).trim())) x.reps = m.reps; x.rest = m.rest; x.tempo = m.tempo; });
       persist(); renderView(); toast(`Méthode ${m.label.toLowerCase()} appliquée`); break;
+    }
+    case 'ps-add': case 'ps-del': case 'ps-fill': {
+      const x = findDay(b.dataset.day)?.exercises.find(y => y.id === b.dataset.ex); if(!x?.perSet) break;
+      if(act === 'ps-add'){ const last = x.perSet[x.perSet.length-1] || {kg:'', reps:''}; x.perSet.push({kg:last.kg, reps:last.reps}); }
+      else if(act === 'ps-del'){ x.perSet.pop(); }
+      else{
+        const step = parseFloat(String(document.getElementById('ps-step-' + x.id)?.value || '').replace(',','.'));
+        const base = parseFloat(String(x.perSet[0]?.kg ?? '').replace(',','.'));
+        if(!isFinite(base)){ toast('Indique d’abord la charge de la série 1'); document.getElementById(`ps-kg-${x.id}-0`)?.focus(); break; }
+        if(!isFinite(step)) break;
+        x.perSet.forEach((p, k) => { p.kg = String(Math.round((base + k*step)*100)/100); });
+        toast(`Charges : ${x.perSet.map(p => fmtN(+p.kg)).join(' → ')} kg`);
+      }
+      x.sets = x.perSet.length; persist(); renderView(); break;
     }
     case 'pk-open': openPicker(b.dataset.target, b.dataset.day); break;
     case 'pk-close': closePicker(); break;
@@ -1874,6 +1916,8 @@ document.addEventListener('input', e => {
       else if(t.dataset.p === 'cardio') d.cardio[f] = f === 'minutes' ? clampInt(t.value, 0, 600, '') : t.value.slice(0,400);
       else{
         const x = d.exercises.find(y => y.id === t.dataset.ex); if(!x) return;
+        if(f === 'same') return;
+        if(t.dataset.p === 'set'){ const ps = x.perSet?.[+t.dataset.i]; if(ps) ps[f] = f === 'kg' ? t.value : t.value.slice(0,12); persistSoon(); return; }
         x[f] = f === 'sets' ? clampInt(t.value, 1, 10, 1) : f === 'rest' ? clampInt(t.value, 0, 600, 0) : f === 'kg' ? t.value : t.value.slice(0, f === 'note' ? 160 : 60);
       }
     }
@@ -1898,6 +1942,18 @@ document.addEventListener('change', e => {
       renderView();
     };
     rd.readAsText(f); t.value = '';
+  }
+  else if(t.dataset.p === 'ex' && t.dataset.field === 'same'){
+    const x = findDay(t.dataset.day)?.exercises.find(y => y.id === t.dataset.ex);
+    if(x){
+      x.varied = !t.checked;
+      if(x.varied){
+        if(!x.perSet?.length) x.perSet = Array.from({length:x.sets || 3}, () => ({kg:x.kg ?? '', reps:String(parseInt(x.reps) || '')}));
+        x.sets = x.perSet.length;
+      }else if(x.perSet?.length){ x.sets = x.perSet.length; if(x.kg === '' || x.kg == null) x.kg = x.perSet[0].kg; }
+      persist(); renderView();
+      document.getElementById('de-same-' + x.id)?.closest('.ed')?.scrollIntoView({block:'nearest'});
+    }
   }
   else if(t.dataset.p){ persist(); }
 });
