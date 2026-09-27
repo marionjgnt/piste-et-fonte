@@ -547,8 +547,55 @@ const EXDB = {
   'Dead bug':['core',['abdos'],ALLEQ,[],0],
   'Relevés de jambes':['core',['abdos'],['pdc','barre','salle'],['dos'],0],
   'Crunch à la poulie':['core',['abdos'],['salle'],[],0],
-  'Russian twists':['core',['abdos'],ALLEQ,['dos'],0]
+  'Russian twists':['core',['abdos'],ALLEQ,['dos'],0],
+  'Squat sumo':['bas',['jambes','fessiers'],['halteres','kettlebell','salle'],['genoux'],1],
+  'Adduction machine':['bas',['jambes'],['salle'],[],0],
+  'Leg curl allongé':['bas',['jambes'],['salle'],[],0],
+  'Good morning':['bas',['fessiers','jambes'],['salle'],['dos'],1],
+  'Nordic curl':['bas',['jambes'],['pdc'],['genoux'],0],
+  'Mollets assis':['bas',['jambes'],['salle'],[],0],
+  'Mollets sur marche':['bas',['jambes'],ALLEQ,[],0],
+  'Curl marteau':['pull',['bras'],['halteres','kettlebell'],[],0],
+  'Écarté poulie':['push',['pecs'],['salle'],[],0],
+  'Élévations frontales':['push',['epaules'],['halteres','salle'],[],0],
+  'Pompes diamant':['push',['bras','pecs'],ALLEQ,['poignets'],1]
 };
+// Muscles travaillés par exercice (le premier est le muscle principal), pour les séances ciblées.
+const EXM = {
+  'Squat barre':['quadriceps','fessiers'], 'Presse à cuisses':['quadriceps','fessiers'], 'Machine hack squat':['quadriceps','fessiers'], 'Goblet squat':['quadriceps','fessiers'], 'Squat':['quadriceps','fessiers'],
+  'Soulevé de terre roumain':['ischios','fessiers'], 'Soulevé de terre roumain haltères':['ischios','fessiers'], 'Hip thrust':['fessiers','ischios'], 'Hip thrust haltère':['fessiers','ischios'], 'Pont fessier':['fessiers'],
+  'Fentes bulgares':['fessiers','quadriceps'], 'Fentes arrière':['fessiers','quadriceps'], 'Step up':['quadriceps','fessiers'], 'Leg curl assis':['ischios'], 'Leg curl allongé':['ischios'], 'Leg extension':['quadriceps'],
+  'Abduction machine':['fessiers'], 'Kickback à la poulie':['fessiers'], 'Abduction élastique':['fessiers'], 'Kettlebell swing':['fessiers','ischios'], 'Mollets debout':['mollets'], 'Mollets assis':['mollets'], 'Mollets sur marche':['mollets'],
+  'Squat sumo':['adducteurs','fessiers','quadriceps'], 'Adduction machine':['adducteurs'], 'Good morning':['ischios','fessiers'], 'Nordic curl':['ischios'],
+  'Développé couché':['pecs','triceps'], 'Développé couché haltères':['pecs','triceps'], 'Développé incliné haltères':['pecs','epaules'], 'Pompes':['pecs','triceps'], 'Pompes diamant':['triceps','pecs'], 'Pec deck':['pecs'], 'Écarté poulie':['pecs'], 'Dips':['triceps','pecs'],
+  'Développé militaire':['epaules','triceps'], 'Développé épaules haltères':['epaules','triceps'], 'Élévations latérales':['epaules'], 'Élévations frontales':['epaules'], 'Oiseau haltères':['epaules','dos'], 'Face pull':['epaules','dos'],
+  'Extension triceps poulie':['triceps'], 'Extension triceps haltère':['triceps'],
+  'Tractions':['dos','biceps'], 'Tirage vertical':['dos','biceps'], 'Rowing haltère':['dos','biceps'], 'Rowing barre':['dos','biceps'], 'Tirage horizontal':['dos','biceps'], 'Rowing élastique':['dos'], 'Rowing inversé':['dos','biceps'], 'Superman':['dos'],
+  'Curl biceps':['biceps'], 'Curl haltères':['biceps'], 'Curl élastique':['biceps'], 'Curl marteau':['biceps'],
+  'Gainage planche':['abdos'], 'Gainage latéral':['abdos'], 'Dead bug':['abdos'], 'Relevés de jambes':['abdos'], 'Crunch à la poulie':['abdos'], 'Russian twists':['abdos']
+};
+const SPLIT_TYPES = {full:['Full body','Tout le corps dans la même séance'], haut:['Haut du corps complet','Plusieurs muscles : pecs, dos, épaules, bras'], bas:['Bas du corps complet','Plusieurs muscles : fessiers, quadriceps, ischios, mollets'], hautC:['Haut du corps ciblé','2 à 3 muscles au choix'], basC:['Bas du corps ciblé','2 à 3 muscles au choix']};
+const SPLIT_ORDER = ['full','haut','bas','hautC','basC'];
+const HAUT_M = {pecs:'Pectoraux', dos:'Dos', epaules:'Épaules', biceps:'Biceps', triceps:'Triceps', abdos:'Abdos'};
+const BAS_M = {fessiers:'Fessiers', quadriceps:'Quadriceps', ischios:'Ischios', mollets:'Mollets', adducteurs:'Adducteurs', abdos:'Abdos'};
+const MUSCLE_LABEL = Object.assign({}, HAUT_M, BAS_M);
+const splitTotal = a => SPLIT_ORDER.reduce((t, k) => t + (+a.split?.[k] || 0), 0);
+function joinFr(list){ return list.length <= 1 ? (list[0] || '') : list.slice(0, -1).join(', ') + ' & ' + list[list.length - 1]; }
+function cibleName(ms){ const l = ms.map(m => MUSCLE_LABEL[m] || m); return joinFr([l[0], ...l.slice(1).map(x => x.toLowerCase())]); }
+function splitText(a){
+  const parts = [];
+  ['full','haut','bas'].forEach(k => { if(+a.split?.[k]) parts.push(`${a.split[k]}× ${SPLIT_TYPES[k][0]}`); });
+  ['hautC','basC'].forEach(k => (a.targets?.[k] || []).slice(0, +a.split?.[k] || 0).forEach(ms => parts.push(ms.length ? cibleName(ms) : SPLIT_TYPES[k][0])));
+  return parts.join(', ') || 'Pas de muscu';
+}
+function suggestSplit(a){
+  const z = new Set(a.zones || []), deb = a.level === 'debutant';
+  const lower = ['fessiers','jambes'].some(x => z.has(x)), upper = ['dos','pecs','epaules','bras'].some(x => z.has(x));
+  if(z.has('global') || (!lower && !upper)) return {full: deb ? 2 : 3, haut:0, bas:0, hautC:0, basC:0};
+  if(lower && !upper) return {full:0, haut:1, bas:2, hautC:0, basC:0};
+  if(upper && !lower) return {full:0, haut:2, bas:1, hautC:0, basC:0};
+  return {full:1, haut:1, bas:1, hautC:0, basC:0};
+}
 const LEVELS = {
   debutant:{label:'Débutant', sub:'Moins de 6 mois'},
   inter:   {label:'Intermédiaire', sub:'6 mois à 2 ans'},
@@ -777,7 +824,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1167,6 +1214,8 @@ function newTest(mode){
   if(!a.equip) a.equip = [];
   ['zones','cardioTypes','limits'].forEach(k => { if(!Array.isArray(a[k])) a[k] = []; });
   if(!a.weekly) a.weekly = {bas:0,haut:0,full:0,push:0,pull:0,cardio:0};
+  if(!a.split) a.split = {full:0, haut:0, bas:0, hautC:0, basC:0};
+  if(!a.targets) a.targets = {hautC:[], basC:[]};
   const t = {flow:null, i:0, a};
   if(mode === 'create'){ t.flow = 'create'; t.i = 1; }
   if(mode === 'complete'){ t.flow = 'complete'; t.i = 0; }
@@ -1175,7 +1224,7 @@ function newTest(mode){
 function testSteps(t){
   const base = ['prenom','toi','objectifs','niveau','quotidien'];
   if(t.flow === 'complete') return [...base, 'recapInfo'];
-  const create = ['zones','dispo','materiel', ...(t.a.cardioN > 0 ? ['cardio'] : []), 'limites', 'recap'];
+  const create = ['zones','organisation', ...((+t.a.split.hautC || 0) + (+t.a.split.basC || 0) > 0 ? ['cibles'] : []), 'dispo','materiel', ...(t.a.cardioN > 0 ? ['cardio'] : []), 'limites', 'recap'];
   return [...base, 'choix', ...(t.flow === 'perso' ? ['semaine','recap'] : t.flow === 'create' ? create : [])];
 }
 function testValid(t){
@@ -1189,7 +1238,9 @@ function testValid(t){
     objectifs: a.goals.length > 0,
     zones: a.zones.length > 0,
     niveau: !!a.level,
-    dispo: (+a.days + +a.cardioN) >= 1 && !!a.duration,
+    dispo: (splitTotal(a) + +a.cardioN) >= 1 && !!a.duration,
+    organisation: true,
+    cibles: ['hautC','basC'].every(k => (a.targets[k] || []).slice(0, +a.split[k] || 0).every(ms => ms.length >= 2 && ms.length <= 3)),
     materiel: a.equip.length > 0,
     cardio: a.cardioTypes.length > 0,
     limites: true, recap: true
@@ -1254,9 +1305,28 @@ function viewTest(){
   }else if(st === 'niveau'){
     body = `<h1>Ton niveau</h1><p class="lead">Depuis combien de temps tu t’entraînes régulièrement ?</p>
     <div class="choices" style="margin-top:16px">${Object.entries(LEVELS).map(([k,l]) => choice('level', k, l.label, l.sub)).join('')}</div>`;
+  }else if(st === 'organisation'){
+    const tot = splitTotal(a);
+    body = `<h1>Ta semaine de muscu</h1><p class="lead">Combien de séances de chaque type tu veux par semaine ? ${a.splitSuggested ? 'Je t’ai fait une proposition d’après tes zones : modifie-la comme tu veux.' : ''}</p>
+    <div class="list" style="margin-top:16px">${SPLIT_ORDER.map(k => `<div class="counter">
+      <div><div style="font-weight:600">${SPLIT_TYPES[k][0]}</div><div class="sub">${SPLIT_TYPES[k][1]}</div></div>
+      <button type="button" class="btn icon" data-act="t-split" data-f="${k}" data-d="-1" aria-label="Moins" ${a.split[k] ? '' : 'disabled'}>−</button>
+      <span class="n num">${a.split[k] || 0}</span>
+      <button type="button" class="btn icon" data-act="t-split" data-f="${k}" data-d="1" aria-label="Plus" ${tot >= 7 ? 'disabled' : ''}>+</button>
+    </div>`).join('')}</div>
+    <p class="small num" style="margin-top:10px;font-weight:600">${tot} séance${tot > 1 ? 's' : ''} de muscu par semaine</p>
+    <p class="small muted" style="margin-top:4px">Les séances ciblées (2 à 3 muscles) conviennent surtout à partir de 4 séances par semaine : chaque muscle y reçoit plus de travail.</p>`;
+  }else if(st === 'cibles'){
+    const block = (k, list, title) => (a.targets[k] || []).slice(0, a.split[k] || 0).map((ms, i) => `<div class="card stack" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between"><b>${title}${(a.split[k] || 0) > 1 ? ' n°' + (i+1) : ''}</b><span class="small muted num">${ms.length}/3</span></div>
+      <div class="pills">${Object.entries(list).map(([m, l]) => `<button type="button" class="pill" data-act="t-cible" data-kind="${k}" data-i="${i}" data-v="${m}" aria-pressed="${ms.includes(m)}">${l}</button>`).join('')}</div>
+      ${ms.length >= 2 ? `<p class="small muted">Nom de la séance : ${esc(cibleName(ms))}</p>` : '<p class="small muted">Choisis 2 ou 3 muscles.</p>'}
+    </div>`).join('');
+    body = `<h1>Tes séances ciblées</h1><p class="lead">Pour chaque séance ciblée, choisis 2 ou 3 muscles à travailler.</p>
+    ${block('hautC', HAUT_M, 'Haut du corps ciblé')}${block('basC', BAS_M, 'Bas du corps ciblé')}`;
   }else if(st === 'dispo'){
     body = `<h1>Tes disponibilités</h1>
-    <h2 class="sec">Séances de muscu par semaine</h2><div class="pills">${[0,1,2,3,4,5,6].map(n => pill('days', n, n, true)).join('')}</div>
+    <p class="lead">Ta muscu : ${esc(splitText(a))}.</p>
     <h2 class="sec">Séances de cardio en plus</h2><div class="pills">${[0,1,2,3,4,5].map(n => pill('cardioN', n, n ? cardioLabel(n) : 'Aucune', true)).join('')}</div>
     <h2 class="sec">Durée d’une séance</h2><div class="pills">${DURATIONS.map(d => pill('duration', d, fmtHM(d), true)).join('')}</div>`;
   }else if(st === 'materiel'){
@@ -1281,7 +1351,8 @@ function viewTest(){
       ${row('Quotidien', esc(QUOTIDIEN[a.quotidien]?.[0] || ''))}
       ${perso ? row('Semaine', esc(FOCUS_ORDER.filter(f => a.weekly[f]).map(f => `${a.weekly[f]}× ${FOCUS[f]}`).join(', '))) : `
       ${row('Zones', esc(a.zones.map(z => ZONES[z]).join(', ')))}
-      ${row('Semaine', esc(`${a.days} muscu${a.cardioN ? ` + ${cardioLabel(a.cardioN)} cardio` : ''} · ${fmtHM(a.duration)}`))}
+      ${row('Muscu', esc(splitText(a)))}
+      ${row('Semaine', esc(`${splitTotal(a)} muscu${a.cardioN ? ` + ${cardioLabel(a.cardioN)} cardio` : ''} · ${fmtHM(a.duration)}`))}
       ${row('Matériel', esc(a.equip.map(e => EQUIP2[e][0]).join(', ')))}
       ${a.cardioN ? row('Cardio', esc(a.cardioTypes.map(c => CARDIO_TYPES[c].label).join(', '))) : ''}
       ${row('Limites', esc(a.limits.filter(x => x !== 'aucune').map(l => LIMITS[l]).join(', ') || 'Aucune'))}`}
@@ -1307,6 +1378,8 @@ function finishTest(){
     return;
   }
   if(flow === 'create'){
+    a.days = splitTotal(a);
+    ['hautC','basC'].forEach(k => { a.targets[k] = (a.targets[k] || []).slice(0, +a.split[k] || 0); });
     a.goal = a.goals[0]; a.equipment = a.equip.includes('salle') ? 'salle' : a.equip.includes('halteres') ? 'halteres' : 'pdc';
     if(a.cardioN && !a.cardioTypes.length) a.cardioTypes = ['tapis'];
   }else{
@@ -1336,11 +1409,20 @@ function buildProgramme(p){
   const lowerFocus = lowerZ > 0 && lowerZ >= upperZ && !zones.has('global'), upperFocus = upperZ > lowerZ && !zones.has('global');
   const deb = p.level === 'debutant';
   const n = p.days === undefined || p.days === '' ? 3 : +p.days;
-  const split = n <= 0 ? [] : n === 1 ? ['full'] : n === 2 ? ['full','full']
+  const autoSplit = n <= 0 ? [] : n === 1 ? ['full'] : n === 2 ? ['full','full']
     : n === 3 ? (lowerFocus ? ['bas','haut','bas'] : upperFocus ? ['push','bas','pull'] : deb || zones.has('global') ? ['full','full','full'] : ['push','pull','bas'])
     : n === 4 ? (upperFocus ? ['haut','bas','haut','bas'] : ['bas','haut','bas','haut'])
     : n === 5 ? (lowerFocus ? ['bas','push','bas','pull','bas'] : ['push','pull','bas','haut','bas'])
     : ['push','pull','bas','push','pull','bas'];
+  // Organisation choisie par la personne (types de séances et muscles ciblés), sinon organisation automatique.
+  const plan = p.split && splitTotal(p) > 0 ? [
+    ...Array.from({length:+p.split.full || 0}, () => ({focus:'full'})),
+    ...Array.from({length:+p.split.haut || 0}, () => ({focus:'haut'})),
+    ...Array.from({length:+p.split.bas || 0}, () => ({focus:'bas'})),
+    ...(p.targets?.hautC || []).slice(0, +p.split.hautC || 0).map(ms => ({focus:'haut', muscles:ms})),
+    ...(p.targets?.basC || []).slice(0, +p.split.basC || 0).map(ms => ({focus:'bas', muscles:ms}))
+  ] : autoSplit.map(f => ({focus:f}));
+  const split = plan;
   const nEx = Math.max(4, (p.duration <= 30 ? 4 : p.duration <= 45 ? 5 : p.duration <= 60 ? 6 : 7) - (deb ? 1 : 0));
   const avail = Object.entries(EXDB).filter(([name, [g, z, e, av]]) => e.some(x => eq.has(x)) && !av.some(x => lim.has(x)));
   const used = {};
@@ -1349,6 +1431,7 @@ function buildProgramme(p){
     const cands = avail.filter(([, [g]]) => g === group).map(([name, [g, z, e, av, comp]]) => {
       let sc = comp ? 2 : 0;
       if(z.some(x => zones.has(x))) sc += 3;
+      if(eq.has('salle') && ['Squat','Superman','Mollets sur marche','Pont fessier'].includes(name)) sc -= 3;
       if(prevUsed.has(name)) sc -= 4;
       if(deb && ['Squat barre','Soulevé de terre roumain','Développé militaire','Tractions','Dips','Rowing barre'].includes(name)) sc -= 1;
       if((p.notes || '').toLowerCase().includes(name.toLowerCase())) sc += 2;
@@ -1357,20 +1440,62 @@ function buildProgramme(p){
     return cands.slice(0, count);
   };
   const variants = {};
-  const days = split.map(focus => {
-    const v = variants[focus] = (variants[focus] ?? -1) + 1;
+  const pickMuscle = (muscle, count, key, variant, taken) => {
+    const prevUsed = used[key + (variant - 1)] || new Set();
+    return avail.filter(([name]) => (EXM[name] || []).includes(muscle) && !taken.has(name)).map(([name, [g, z, e, av, comp]]) => {
+      let sc = (EXM[name][0] === muscle ? 3 : 0) + (comp ? 2 : 0);
+      if(eq.has('salle') && ['Squat','Superman','Mollets sur marche','Pont fessier'].includes(name)) sc -= 3;
+      if(prevUsed.has(name)) sc -= 4;
+      if(deb && ['Squat barre','Soulevé de terre roumain','Développé militaire','Tractions','Dips','Rowing barre','Good morning','Nordic curl'].includes(name)) sc -= 1;
+      if((p.notes || '').toLowerCase().includes(name.toLowerCase())) sc += 2;
+      return {name, sc, comp};
+    }).sort((a,b) => b.sc - a.sc).slice(0, count);
+  };
+  // Séance complète : on tourne sur les muscles du groupe, zones prioritaires d'abord (et un exercice de plus).
+  const completeParts = (focus, k, key, v) => {
+    const base = {bas:['fessiers','quadriceps','ischios','mollets'], haut:['pecs','dos','epaules','triceps','biceps'], full:['quadriceps','dos','pecs','fessiers','ischios','epaules']}[focus];
+    const zmap = {fessiers:['fessiers'], jambes:['quadriceps','ischios'], dos:['dos'], pecs:['pecs'], epaules:['epaules'], bras:['triceps','biceps']};
+    const prio = [...new Set([...zones].flatMap(z => zmap[z] || []))].filter(m => base.includes(m));
+    const seq = [...prio, ...base.filter(m => !prio.includes(m)), ...prio];
+    const once = ['mollets','biceps','triceps'];
+    const taken = new Set(), out = [], count = {};
+    for(let round = 0; round < 3 && out.length < k; round++){
+      for(const mu of seq){
+        if(out.length >= k) break;
+        if(once.includes(mu) && count[mu]) continue;
+        const got = pickMuscle(mu, 1, key, v, taken)[0];
+        if(got){ taken.add(got.name); out.push(got); count[mu] = (count[mu] || 0) + 1; }
+      }
+    }
+    return out;
+  };
+  const days = split.map(item => {
+    const focus = item.focus;
+    const key = item.muscles ? 'c:' + item.muscles.join('+') : focus;
+    const v = variants[key] = (variants[key] ?? -1) + 1;
+    if(item.muscles){
+      const taken = new Set(), parts = [];
+      const SMALL = ['mollets','adducteurs','abdos'];
+      const small = item.muscles.filter(m => SMALL.includes(m)), big = item.muscles.filter(m => !SMALL.includes(m));
+      const smallN = Math.min(2, Math.max(1, Math.round(nEx / item.muscles.length)));
+      const bigN = big.length ? Math.max(2, Math.round((nEx - small.length * smallN) / big.length)) : 0;
+      [...big, ...small].forEach(mu => { const got = pickMuscle(mu, SMALL.includes(mu) ? smallN : bigN, key, v, taken); got.forEach(x => { taken.add(x.name); parts.push(x); }); });
+      item.parts = parts;
+    }
     const core = zones.has('abdos') || focus === 'full' ? 1 : 0;
     const k = nEx - core;
-    let parts = [];
-    if(focus === 'bas') parts = pick('bas', k, focus, v);
+    let parts = item.parts || [];
+    if(!parts.length && ['bas','haut','full'].includes(focus)) parts = completeParts(focus, k, key, v);
+    if(parts.length) {}
+    else if(focus === 'bas') parts = pick('bas', k, focus, v);
     else if(focus === 'push') parts = pick('push', k, focus, v);
     else if(focus === 'pull') parts = pick('pull', k, focus, v);
     else if(focus === 'haut'){ const a = Math.ceil(k/2); const P = pick('push', a, focus, v), Q = pick('pull', k - a, focus, v); for(let i = 0; i < Math.max(P.length, Q.length); i++){ if(P[i]) parts.push(P[i]); if(Q[i]) parts.push(Q[i]); } }
     else { const nb = lowerFocus ? Math.ceil(k/2) : Math.round(k/3); const B = pick('bas', nb, focus, v), P = pick('push', Math.ceil((k-nb)/2), focus, v), Q = pick('pull', k - nb - Math.ceil((k-nb)/2), focus, v); parts = [...B, ...P, ...Q]; }
-    if(core) parts.push(...pick('core', 1, focus + 'core', v));
+    if(core && !item.muscles) parts.push(...pick('core', 1, focus + 'core', v));
     const comp = parts.filter(x => x.comp && EXDB[x.name][0] !== 'core'), iso = parts.filter(x => !x.comp && EXDB[x.name][0] !== 'core'), cr = parts.filter(x => EXDB[x.name][0] === 'core');
     const ordered = [...comp, ...iso, ...cr];
-    used[focus + v] = new Set(ordered.map(x => x.name));
+    used[key + v] = new Set(ordered.map(x => x.name));
     const olderRest = +p.age >= 50 ? 15 : 0;
     const exercises = ordered.map((x, idx) => {
       const timed = TIMED.has(x.name);
@@ -1387,10 +1512,10 @@ function buildProgramme(p){
       if(lim.has('dos') && x.comp) ex.note = ex.note || 'Dos neutre, gainage serré.';
       return ex;
     });
-    return {id:newId(), name:'', kind:'muscu', focus, exercises};
+    return {id:newId(), name:'', label: item.muscles ? cibleName(item.muscles) : ({full:'Full body', haut:'Haut du corps', bas:'Bas du corps'}[focus] || FOCUS[focus]), kind:'muscu', focus, exercises};
   });
-  const counts = {}; days.forEach(d => counts[d.focus] = (counts[d.focus] || 0) + 1);
-  const seen = {}; days.forEach(d => { const i = seen[d.focus] = (seen[d.focus] ?? -1) + 1; d.name = dayName(d.focus, i, counts[d.focus]); });
+  const counts = {}; days.forEach(d => counts[d.label] = (counts[d.label] || 0) + 1);
+  const seen = {}; days.forEach(d => { const i = seen[d.label] = (seen[d.label] ?? -1) + 1; d.name = counts[d.label] > 1 ? `${d.label} ${'ABCDEFG'[i]}` : d.label; delete d.label; });
   const types = p.cardioTypes?.length ? p.cardioTypes : ['tapis'];
   for(let c = 0; c < (+p.cardioN || 0); c++){
     const type = types[c % types.length], minutes = Math.min(+p.duration || 45, 90);
@@ -1503,7 +1628,8 @@ function viewProfil(){
     ${row('Objectifs', esc(p.goals.map(g => GOALS[g]?.label).filter(Boolean).join(', ')))}
     ${row('Zones', esc((p.zones || []).map(z => ZONES[z]).join(', ')))}
     ${row('Niveau', esc(LEVELS[p.level]?.label || ''))}
-    ${row('Semaine', esc(`${p.days} muscu${p.cardioN ? ` + ${cardioLabel(p.cardioN)} cardio` : ''} · ${fmtHM(p.duration)}`))}
+    ${p.split ? row('Muscu', esc(splitText(p))) : ''}
+    ${row('Semaine', esc(`${p.split ? splitTotal(p) : p.days} muscu${p.cardioN ? ` + ${cardioLabel(p.cardioN)} cardio` : ''} · ${fmtHM(p.duration)}`))}
     ${row('Matériel', esc((p.equip || []).map(e => EQUIP2[e]?.[0]).join(', ')))}
     ${row('Limites', esc((p.limits || []).map(l => LIMITS[l]).join(', ') || 'Aucune'))}
   </div>
@@ -2335,12 +2461,28 @@ document.addEventListener('click', e => {
       else { if(k === 'limits'){ const j = arr.indexOf('aucune'); if(j >= 0) arr.splice(j,1); } if(k === 'zones'){ const j = arr.indexOf('global'); if(j >= 0) arr.splice(j,1); } arr.push(v); }
       renderView(); break;
     }
+    case 't-split': {
+      const a = ui.test.a, k = b.dataset.f, d = +b.dataset.d;
+      a.split[k] = Math.max(0, Math.min(7, (+a.split[k] || 0) + d)); a.splitSuggested = false;
+      if(k === 'hautC' || k === 'basC'){ const arr = a.targets[k] ||= []; while(arr.length < a.split[k]) arr.push([]); }
+      renderView(); break;
+    }
+    case 't-cible': {
+      const arr = ui.test.a.targets[b.dataset.kind][+b.dataset.i], v = b.dataset.v, i = arr.indexOf(v);
+      if(i >= 0) arr.splice(i, 1); else if(arr.length >= 3){ toast('3 muscles maximum par séance'); break; } else arr.push(v);
+      renderView(); break;
+    }
     case 't-count': { const w = ui.test.a.weekly; w[b.dataset.f] = Math.max(0, Math.min(7, (w[b.dataset.f]||0) + +b.dataset.d)); renderView(); break; }
     case 't-back': ui.test.i--; if(ui.test.i < 2 && !journal.profile) {} renderView(); window.scrollTo(0,0); break;
     case 't-next': {
       if(!testValid(ui.test)) break;
       const steps = testSteps(ui.test);
-      if(ui.test.i < steps.length - 1 || !ui.test.flow){ ui.test.i++; renderView(); window.scrollTo(0,0); } else finishTest();
+      if(ui.test.i < steps.length - 1 || !ui.test.flow){
+        ui.test.i++;
+        const a = ui.test.a;
+        if(testSteps(ui.test)[ui.test.i] === 'organisation' && splitTotal(a) === 0){ a.split = suggestSplit(a); a.splitSuggested = true; }
+        renderView(); window.scrollTo(0,0);
+      } else finishTest();
       break;
     }
     case 't-quit': ui.test = null; ui.skipWelcome = true; renderView(); break;
