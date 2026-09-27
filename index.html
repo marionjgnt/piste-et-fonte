@@ -1605,7 +1605,7 @@ function viewProgramme(){
   return `${errBox}<div class="prog-head">
       <label class="small muted" for="prog-name">Mon programme</label>
       <input id="prog-name" data-p="prog-name" value="${esc(P.name)}" autocomplete="off">
-      <div class="row" style="gap:6px"><span class="chip ${P.source === 'ia' ? 'cardio' : 'muscu'}">${P.source === 'ia' ? 'Créé par l’IA' : P.source === 'auto' ? 'Créé d’après ton bilan' : 'Programme perso'}</span><span class="chip">Méthode ${m.label.toLowerCase()}</span><span class="chip num">${P.days.length} séance${P.days.length>1?'s':''} / sem.</span></div>
+      <div class="row" style="gap:6px"><span class="chip ${P.source === 'ia' ? 'cardio' : 'muscu'}">${P.source === 'ia' ? 'Créé par l’IA' : P.source === 'auto' ? 'Créé d’après ton bilan' : 'Programme perso'}</span>${P.source !== 'perso' ? `<span class="chip">Méthode ${m.label.toLowerCase()}</span>` : ''}<span class="chip num">${P.days.length} séance${P.days.length>1?'s':''} / sem.</span></div>
       ${P.summary ? `<p class="small muted">${esc(P.summary)}</p>` : ''}
     </div>
     <div class="stack" style="margin-top:16px">
