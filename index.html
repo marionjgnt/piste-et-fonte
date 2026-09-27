@@ -402,9 +402,16 @@ details.card[open] > summary::after{content:" ▾"}
 .back{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--accent);font-weight:600;padding:0;min-height:36px}
 @media (prefers-reduced-motion:reduce){.spinner{animation-duration:3s}}
 
+/* Écran de démarrage */
+#splash{position:fixed;inset:0;z-index:100;background:#FAF6F1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .6s ease}
+#splash.out{opacity:0;pointer-events:none}
+#splash img{width:116px;height:116px;border-radius:28px;box-shadow:0 12px 32px rgba(120,95,75,.22)}
+#splash span{font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;font-weight:700;font-size:20px;letter-spacing:.28em;color:#8C7463;padding-left:.28em}
+@media (prefers-reduced-motion:reduce){#splash{transition:none}}
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="icon-512.png?v=2" alt=""><span>MOVA</span></div>
 
 <div class="wrap">
   <div class="top">
@@ -437,6 +444,14 @@ details.card[open] > summary::after{content:" ▾"}
 </div>
 
 <script>
+// Écran de démarrage : 1,5 s puis fondu. Pas affiché juste après une mise à jour automatique.
+(function(){
+  const sp = document.getElementById('splash'); if(!sp) return;
+  let skip = false;
+  try{ skip = sessionStorage.getItem('pf.noSplash') === '1'; sessionStorage.removeItem('pf.noSplash'); }catch(e){}
+  if(skip){ sp.remove(); return; }
+  setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 700); }, 1500);
+})();
 (function(){
 'use strict';
 
@@ -838,11 +853,12 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if(refreshing) return; refreshing = true; location.reload(); });
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if(refreshing || !hadController) return; refreshing = true; try{ sessionStorage.setItem('pf.noSplash', '1'); }catch(e){} location.reload(); });
   navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => {
     let wake = Date.now();
     document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') wake = Date.now(); });
