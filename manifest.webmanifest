@@ -1,13 +1,13 @@
 {
-  "name": "Piste & Fonte",
-  "short_name": "Piste & Fonte",
+  "name": "Mova",
+  "short_name": "Mova",
   "description": "Ton carnet de muscu et de cardio : programme, séances, chrono, archive et courbes.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F6F1FF",
+  "background_color": "#EFE9E1",
   "theme_color": "#F6F1FF",
   "icons": [
     {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},

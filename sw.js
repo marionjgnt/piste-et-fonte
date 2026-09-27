@@ -1,6 +1,6 @@
-// Piste & Fonte : service worker (hors connexion + mises à jour)
+// Mova : service worker (hors connexion + mises à jour)
 // À chaque nouvelle version : changer VERSION ici ET APP_VERSION dans index.html.
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 const CACHE = 'pf-' + VERSION;
 const FONTS = 'fonts-v1';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];

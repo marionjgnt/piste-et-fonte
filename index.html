@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Piste &amp; Fonte">
-<title>Piste &amp; Fonte</title>
+<meta name="apple-mobile-web-app-title" content="Mova">
+<title>Mova</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
@@ -375,8 +375,8 @@ details.card[open] > summary::after{content:" ▾"}
 <div class="wrap">
   <div class="top">
     <div class="mark">
-      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="9" width="4" height="8" rx="1.5" fill="var(--chart-b)"/><rect x="5" y="6" width="4" height="14" rx="1.5" fill="var(--chart-a)"/><rect x="9" y="11.5" width="8" height="3" fill="var(--ink)"/><rect x="17" y="6" width="4" height="14" rx="1.5" fill="var(--chart-a)"/><rect x="21" y="9" width="4" height="8" rx="1.5" fill="var(--chart-b)"/></svg>
-      Piste &amp; Fonte
+      <img src="icon-192.png" alt="" width="30" height="30" style="border-radius:8px;display:block">
+      Mova
     </div>
     <div class="status" id="status"><i></i><span>Sur ce téléphone</span></div>
   </div>
@@ -616,7 +616,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.0.7';
+const APP_VERSION = '1.0.8';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1498,7 +1498,7 @@ function viewProgres(){
     </div>
     ${ui.pendingImport ? `<div class="planned stack" style="gap:8px"><p><b>Sauvegarde du ${esc(ui.pendingImport.label)}</b> · ${ui.pendingImport.data.sessions.length} séances. Elle va remplacer les données actuelles de ce téléphone.</p><div class="row"><button type="button" class="btn primary sm" data-act="backup-apply">Remplacer mes données</button><button type="button" class="btn sm ghost" data-act="backup-cancel">Annuler</button></div></div>` : ''}
   </div>
-  <p class="small muted" style="margin-top:14px;text-align:center">Piste &amp; Fonte · version ${APP_VERSION}</p>`;
+  <p class="small muted" style="margin-top:14px;text-align:center">Mova · version ${APP_VERSION}</p>`;
 }
 async function renderGroup(){
   const box = document.getElementById('group');
@@ -1975,7 +1975,7 @@ document.addEventListener('click', e => {
     case 'backup-export': {
       const blob = new Blob([JSON.stringify({app:'piste-et-fonte', exportedAt:new Date().toISOString(), journal}, null, 1)], {type:'application/json'});
       const url = URL.createObjectURL(blob), a = document.createElement('a');
-      a.href = url; a.download = `piste-et-fonte-sauvegarde-${todayISO()}.json`; document.body.append(a); a.click(); a.remove();
+      a.href = url; a.download = `mova-sauvegarde-${todayISO()}.json`; document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000); toast('Sauvegarde téléchargée'); break;
     }
     case 'backup-apply': journal = ui.pendingImport.data; ui.pendingImport = null; persist(); render(); toast('Sauvegarde importée'); break;
@@ -2054,7 +2054,7 @@ document.addEventListener('change', e => {
         const raw = JSON.parse(rd.result), j = migrate(raw.journal || raw);
         if(!Array.isArray(j.sessions)) throw 0;
         ui.pendingImport = {data:j, label: raw.exportedAt ? fmtDate(raw.exportedAt) : f.name};
-      }catch(err){ toast('Ce fichier n’est pas une sauvegarde Piste & Fonte.'); }
+      }catch(err){ toast('Ce fichier n’est pas une sauvegarde Mova.'); }
       renderView();
     };
     rd.readAsText(f); t.value = '';
