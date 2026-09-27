@@ -325,6 +325,8 @@ details.card[open] > summary::after{content:" ▾"}
 
 /* Progrès */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tiles:has(> :nth-child(4)){grid-template-columns:repeat(2,1fr)}
+.tiles .tile:nth-child(4){background:var(--accent-soft)}
 .tile{background:var(--peach-soft);border-radius:18px;padding:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:2px;min-width:0}
 .tile .v{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
 .tiles .tile:nth-child(2),.arch-stats .tile:nth-child(2){background:var(--lilac-soft)}
@@ -689,14 +691,72 @@ function rythme(){
   const c = {}; days.forEach(d => { c[d.focus] = (c[d.focus]||0) + 1; });
   return FOCUS_ORDER.filter(f => c[f]).map(f => `${c[f]}× ${FOCUS[f]}`).join(' · ');
 }
+function restFor(name){
+  const k = String(name).trim().toLowerCase();
+  for(const d of journal.programme?.days || []) for(const e of d.exercises || []) if(e.name.trim().toLowerCase() === k && e.rest != null) return +e.rest;
+  return settings.rest || 90;
+}
+// Durée estimée exercice par exercice : répétitions × temps d'une répétition, installation, pauses entre séries, passage à l'exercice suivant.
+const HEAVY = ['squat barre','front squat','soulevé de terre','soulevé de terre roumain','rdl','développé couché','développé militaire','développé incliné','presse à cuisses','machine hack squat','hack squat','rowing barre','tractions','dips','good morning'];
+const EXPLOSIVE = ['kettlebell swing','burpees','box jumps','squat sauté','squats sautés','fentes sautées','jumping jacks','mountain climbers','thrusters','wall balls','corde à sauter'];
+const UNILATERAL = ['fentes bulgares','fentes arrière','fentes avant','fentes marchées','squat bulgare','step up','step up banc poulie','rowing haltère','pont fessier unilatéral','kickback à la poulie','mollets unilatéraux','fente avec rotation'];
+function repInfo(name){
+  const k = String(name).trim().toLowerCase();
+  const sec = EXPLOSIVE.includes(k) ? 2 : HEAVY.some(h => k === h || k.startsWith(h + ' ')) ? 4 : 3;
+  return {sec, sides: UNILATERAL.includes(k) ? 2 : 1, timed: TIMED.has(String(name).trim())};
+}
+const SET_SETUP = 10, TRANSITION = 90;
+function exerciseTime(e){
+  const info = repInfo(e.name), rest = e.rest != null ? +e.rest : restFor(e.name);
+  const work = e.sets.reduce((a, x) => a + (info.timed ? (+x.reps || 30) : (+x.reps || 10) * info.sec) * info.sides + SET_SETUP, 0);
+  const pauses = Math.max(0, e.sets.length - 1) * rest;
+  return {work, pauses, rest, info, total: work + pauses};
+}
+function estBreakdown(s){
+  const rows = (s.exercises || []).map(e => ({name:e.name, sets:e.sets.length, ...exerciseTime(e)}));
+  const transitions = Math.max(0, rows.length - 1) * TRANSITION;
+  return {rows, transitions, total: rows.reduce((a, r) => a + r.total, 0) + transitions};
+}
+function estMinutes(s){
+  if(s.kind === 'cardio') return (+s.cardio?.sec || 0) / 60;
+  if(s.circuit || !(s.exercises || []).length) return +s.durationMin || 0;
+  return estBreakdown(s).total / 60;
+}
+const fmtSec = sec => { sec = Math.round(sec); const m = Math.floor(sec/60), r = sec % 60; return m ? (r ? `${m} min ${String(r).padStart(2,'0')}` : `${m} min`) : `${r} s`; };
+function breakdownHTML(s){
+  const b = estBreakdown(s);
+  return `<details style="margin-top:8px"><summary class="small muted">Durée ${s.durSet ? 'indiquée' : 'estimée'} : ${fmtHM(effMinutes(s))} · voir le calcul</summary>
+    <ul class="small muted num" style="margin:6px 0 0;padding-left:18px">${b.rows.map(r => `<li><b style="color:var(--ink)">${esc(r.name)}</b> : ${r.sets} série${r.sets > 1 ? 's' : ''} (~${fmtSec(r.work / r.sets)} chacune${r.info.sides > 1 ? ', les 2 côtés' : ''})${r.sets > 1 ? ` + ${r.sets - 1} pause${r.sets > 2 ? 's' : ''} de ${fmtSec(r.rest)}` : ''} = ${fmtSec(r.total)}</li>`).join('')}
+    ${b.transitions ? `<li>Passages d’un exercice à l’autre : ${b.rows.length - 1} × 1 min 30 = ${fmtSec(b.transitions)}</li>` : ''}</ul>
+    <p class="small muted" style="margin-top:4px">Repères : ~3 s par répétition (4 s sur les mouvements lourds, 2 s sur les explosifs), 10 s d’installation par série, et ton temps de repos entre les séries.${s.durSet ? ' Tu as indiqué la durée toi-même : c’est elle qui compte.' : ''}</p>
+  </details>`;
+}
+function effMinutes(s){
+  if(s.kind === 'cardio' || s.circuit || s.durSet) return Math.round(+s.durationMin || estMinutes(s));
+  const est = estMinutes(s), d = +s.durationMin || 0;
+  return Math.round(d >= est * 0.5 && d <= est * 2.5 ? d : est);
+}
+const MET = {crossfit:8, hiit:8, velo:7, rameur:7, natation:7, marche:3.5, course:9, tapis:9, autre:5};
+function kcalOf(s, kg){
+  kg = +kg || 65;
+  if(s.kind === 'cardio'){
+    const c = s.cardio || {}, km = +c.km || 0;
+    if(km && (c.type === 'course' || c.type === 'tapis')) return km * kg * 1.0;
+    if(km && c.type === 'marche') return km * kg * 0.55;
+    return (MET[c.type] || 5) * kg * effMinutes(s) / 60;
+  }
+  return (s.circuit ? 8 : 5) * kg * effMinutes(s) / 60;
+}
 function weekStats(sessions, key){
   const s = sessions.filter(x => !x.manual && weekKey(x.date) === key);
+  const kg = journal.profile?.poids;
   return {
+    kcal: Math.round(s.reduce((a,x) => a + kcalOf(x, kg), 0) / 10) * 10,
     muscu: s.filter(x => x.kind !== 'cardio').length,
     cardio: s.filter(x => x.kind === 'cardio').length,
     total: s.length,
     km: Math.round(s.reduce((a,x) => a + (+x.cardio?.km || 0), 0)*10)/10,
-    minutes: Math.round(s.reduce((a,x) => a + (+x.durationMin || 0), 0))
+    minutes: Math.round(s.reduce((a,x) => a + effMinutes(x), 0))
   };
 }
 async function pushGroup(){
@@ -716,7 +776,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.4';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1489,10 +1549,10 @@ function viewSemaine(){
     ${ps.planned ? `<h2 class="sec">Mon plan</h2>
     <div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && next && r.day.id === next.day.id ? 'next' : ''}">
       <span class="dot">${r.done ? '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>' : ''}</span>
-      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)} · ${fmtHM(r.done.durationMin)}` : daySummary(r.day)}</div></div>
+      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)} · ${fmtHM(effMinutes(r.done))}` : daySummary(r.day)}</div></div>
       ${r.done ? `<span class="chip good">Fait</span>` : `<button type="button" class="btn sm" data-act="day-start" data-id="${r.day.id}">Lancer</button>`}
     </div>`).join('')}</div>` : ''}
-    ${ps.extra.length ? `<h2 class="sec">En plus cette semaine</h2><div class="list">${ps.extra.map(s => `<div class="item"><div><div class="t">${esc(s.name)}</div><div class="d">${fmtDate(s.date)} · ${fmtHM(s.durationMin)}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : 'Muscu'}</span></div>`).join('')}</div>` : ''}
+    ${ps.extra.length ? `<h2 class="sec">En plus cette semaine</h2><div class="list">${ps.extra.map(s => `<div class="item"><div><div class="t">${esc(s.name)}</div><div class="d">${fmtDate(s.date)} · ${fmtHM(effMinutes(s))}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : 'Muscu'}</span></div>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:16px">
       <button type="button" class="btn" data-act="free-muscu">+ Séance muscu libre</button>
       <button type="button" class="btn" data-act="free-cardio">+ Cardio</button>
@@ -1653,10 +1713,10 @@ function sessionItem(s, demo){
     const c = s.cardio || {};
     meta = `${CARDIO_TYPES[c.type]?.label || 'Cardio'} · ${fmtClock(c.sec || 0)}${c.km ? ` · ${fmtN(c.km)} km · ${paceText(c.type, c.km, c.sec)}` : ''}${c.rpe ? ` · ressenti ${c.rpe}/10` : ''}`;
   }else if(s.circuit){
-    meta = `Circuit · ${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s · ${fmtHM(s.durationMin)}`;
+    meta = `Circuit · ${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s · ${fmtHM(effMinutes(s))}`;
   }else{
     const nbEx = (s.exercises||[]).length, nbSets = (s.exercises||[]).reduce((a,e) => a + e.sets.length, 0), vol = volume(s);
-    meta = `${nbEx} exercice${nbEx>1?'s':''} · ${nbSets} séries${vol ? ` · ${fmtN(vol)} kg soulevés` : ''} · ${fmtHM(s.durationMin)}`;
+    meta = `${nbEx} exercice${nbEx>1?'s':''} · ${nbSets} séries${vol ? ` · ${fmtN(vol)} kg soulevés` : ''} · ${fmtHM(effMinutes(s))}`;
   }
   const nbEx = (s.exercises||[]).length;
   return `<div class="item">
@@ -1722,6 +1782,13 @@ function viewMuscuDraft(){
     <datalist id="ex-list">${[...known].sort((a,b)=>a.localeCompare(b,'fr')).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <label class="toggle"><input type="checkbox" id="auto-rest" data-act="auto-rest" ${settings.autoRest ? 'checked' : ''}> Lancer le repos de l’exercice quand je valide une série</label>
     ${ui.msg ? `<p class="msg">${esc(ui.msg)}</p>` : ''}
+    <div class="card stack">
+      <div class="two">
+        <div class="field"><label for="draft-date">Date de la séance</label><input id="draft-date" type="date" data-dd="date" value="${esc(draft.day || todayISO())}" max="${todayISO()}"></div>
+        ${true ? `<div class="field"><label for="draft-dur">Durée (facultatif)</label><select id="draft-dur" data-dd="dur"><option value="">Automatique</option>${[20,30,40,45,50,60,75,90,105,120].map(m => `<option value="${m}" ${+draft.dur === m ? 'selected' : ''}>${fmtHM(m)}</option>`).join('')}</select></div>` : ''}
+      </div>
+      <p class="small muted">Tu remplis ta séance après coup ? Choisis le jour où tu l’as faite.</p>
+    </div>
     <button type="button" class="btn primary wide" data-act="finish">Terminer et enregistrer</button>
     <button type="button" class="btn wide ${ui.confirmCancel ? 'danger' : 'ghost'}" data-act="cancel">${ui.confirmCancel ? 'Confirmer l’abandon (rien ne sera gardé)' : 'Abandonner la séance'}</button>
   </div>`;
@@ -1758,6 +1825,13 @@ function viewCardioDraft(){
       <div class="field"><label for="c-note">Notes (WOD, sensations…)</label><textarea id="c-note" data-c="note" placeholder="Ex. : AMRAP 20 min, 6 tours + 12 reps">${esc(c.note)}</textarea></div>
     </div>
     ${ui.msg ? `<p class="msg">${esc(ui.msg)}</p>` : ''}
+    <div class="card stack">
+      <div class="two">
+        <div class="field"><label for="draft-date">Date de la séance</label><input id="draft-date" type="date" data-dd="date" value="${esc(draft.day || todayISO())}" max="${todayISO()}"></div>
+        ${false ? `<div class="field"><label for="draft-dur">Durée (facultatif)</label><select id="draft-dur" data-dd="dur"><option value="">Automatique</option>${[20,30,40,45,50,60,75,90,105,120].map(m => `<option value="${m}" ${+draft.dur === m ? 'selected' : ''}>${fmtHM(m)}</option>`).join('')}</select></div>` : ''}
+      </div>
+      <p class="small muted">Tu remplis ta séance après coup ? Choisis le jour où tu l’as faite.</p>
+    </div>
     <button type="button" class="btn lane wide" data-act="finish-cardio">Terminer et enregistrer</button>
     <button type="button" class="btn wide ${ui.confirmCancel ? 'danger' : 'ghost'}" data-act="cancel">${ui.confirmCancel ? 'Confirmer l’abandon' : 'Abandonner'}</button>
   </div>`;
@@ -1866,9 +1940,11 @@ function viewProgres(){
   <h2 class="sec">Cette semaine</h2>
   <div class="tiles">
     <div class="tile"><span class="v num">${wk.total}${!j.demo && ps.planned ? `<small> / ${ps.planned}</small>` : ''}</span><span class="l">Séances</span></div>
-    <div class="tile"><span class="v num">${fmtDur(wk.minutes*60)}</span><span class="l">Temps actif</span></div>
+    <div class="tile"><span class="v num">${fmtHM(wk.minutes)}</span><span class="l">Temps actif</span></div>
+    <div class="tile"><span class="v num">${fmtN(wk.kcal)}<small> kcal</small></span><span class="l">Calories dépensées</span></div>
     <div class="tile"><span class="v num">${fmtN(wk.km)}<small> km</small></span><span class="l">Cardio</span></div>
   </div>
+  <p class="small muted" style="margin-top:8px">Estimations : la durée réelle de ta séance quand tu la lances et la termines dans l’appli, sinon calculée exercice par exercice : répétitions × temps d’une répétition, tes pauses entre les séries et le passage d’un exercice à l’autre (détail dans Archive → Par séance). Calories calculées avec ton poids${journal.profile?.poids ? '' : ' (65 kg par défaut, renseigne le tien dans ton profil)'}.</p>
   <h2 class="sec">8 dernières semaines</h2>
   <div class="card chart">${svg}<div class="legend"><span style="--c:var(--chart-a)">Muscu et circuits</span><span style="--c:var(--chart-b)">Cardio</span></div></div>
   <h2 class="sec">Records</h2>
@@ -2088,8 +2164,8 @@ function viewArchive(){
       const n = Math.round((w.start.getTime() - first)/(7*86400000)) + 1, end = new Date(w.start); end.setDate(end.getDate()+6);
       return `<div class="week-block"><div class="week-title"><b>Semaine ${n}</b><span class="small muted">${w.start.getDate()} ${w.start.toLocaleDateString('fr-FR',{month:'short'})} – ${end.getDate()} ${end.toLocaleDateString('fr-FR',{month:'short'})}</span></div>
       ${w.items.map(s => `<div class="card">
-        <div class="row" style="justify-content:space-between"><div><div style="font-weight:600">${s.manual ? 'Saisie d’archive' : esc(s.name)}</div><div class="small muted">${fmtDate(s.date)}${s.durationMin ? ` · ${fmtHM(s.durationMin)}` : ''}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : s.circuit ? 'Circuit' : 'Muscu'}</span></div>
-        ${(s.exercises||[]).length ? `<table class="sess-tbl" style="margin-top:8px"><tbody>${s.exercises.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${setsSummary(e.sets, exMetaOf(e.name).perSide)}</td></tr>`).join('')}</tbody></table>` : ''}
+        <div class="row" style="justify-content:space-between"><div><div style="font-weight:600">${s.manual ? 'Saisie d’archive' : esc(s.name)}</div><div class="small muted">${fmtDate(s.date)}${effMinutes(s) ? ` · ${fmtHM(effMinutes(s))}` : ''}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : s.circuit ? 'Circuit' : 'Muscu'}</span></div>
+        ${(s.exercises||[]).length ? `<table class="sess-tbl" style="margin-top:8px"><tbody>${s.exercises.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${setsSummary(e.sets, exMetaOf(e.name).perSide)}</td></tr>`).join('')}</tbody></table>${breakdownHTML(s)}` : ''}
         ${s.kind === 'cardio' ? `<p class="small muted num" style="margin-top:6px">${CARDIO_TYPES[s.cardio?.type]?.label || 'Cardio'} · ${fmtClock(s.cardio?.sec || 0)}${s.cardio?.km ? ` · ${fmtN(s.cardio.km)} km` : ''}${s.cardio?.note ? ` · ${esc(s.cardio.note)}` : ''}</p>` : ''}
         ${s.circuit ? `<p class="small muted num" style="margin-top:6px">${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s</p>` : ''}
       </div>`).join('')}</div>`;
@@ -2182,6 +2258,12 @@ function closePicker(){
 
 /* ================= Actions ================= */
 function findDay(id){ return journal.programme?.days.find(d => d.id === id); }
+function draftDateISO(){
+  if(!draft.day || draft.day === todayISO()) return new Date(draft.startedAt).toISOString();
+  const t = new Date(draft.startedAt), d = new Date(draft.day + 'T12:00:00');
+  d.setHours(t.getHours(), t.getMinutes(), 0, 0);
+  return d.toISOString();
+}
 function startDraft(d){ draft = d; ui.confirmCancel = false; ui.msg = ''; saveDraft(); go('seance'); }
 function startFromDay(day){
   if(draft){ toast('Termine ou abandonne ta séance en cours d’abord.'); go('seance'); return; }
@@ -2349,9 +2431,10 @@ document.addEventListener('click', e => {
       break;
     }
     case 'finish': {
-      const exercises = draft.exercises.map(e => ({name:e.name, sets:e.sets.filter(s => +s.reps > 0).map(s => { const o = {reps:+s.reps, kg:+s.kg || 0}; if(s.feel) o.feel = s.feel; if(s.note && s.note.trim()) o.note = s.note.trim().slice(0,200); return o; })})).filter(e => e.sets.length);
+      const exercises = draft.exercises.map(e => ({name:e.name, rest:e.rest ?? settings.rest, sets:e.sets.filter(s => +s.reps > 0).map(s => { const o = {reps:+s.reps, kg:+s.kg || 0}; if(s.feel) o.feel = s.feel; if(s.note && s.note.trim()) o.note = s.note.trim().slice(0,200); return o; })})).filter(e => e.sets.length);
       if(!exercises.length){ ui.msg = 'Remplis au moins une série (nombre de répétitions) avant d’enregistrer.'; renderView(); break; }
-      journal.sessions.unshift({id:newId(), date:new Date(draft.startedAt).toISOString(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin:Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), exercises});
+      journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin: +draft.dur || Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), ...(+draft.dur ? {durSet:true} : {}), exercises});
+      journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
       draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('semaine');
       break;
     }
@@ -2359,7 +2442,8 @@ document.addEventListener('click', e => {
       const c = draft.cardio, sec = cardioSec(c), km = parseFloat(String(c.km).replace(',','.')) || 0;
       if(!(sec > 0)){ ui.msg = 'Indique la durée de ta séance.'; renderView(); break; }
       const out = {type:c.type, sec}; if(km > 0 && CARDIO_TYPES[c.type]?.unit) out.km = Math.round(km*100)/100; if(c.rpe) out.rpe = +c.rpe; if(c.note.trim()) out.note = c.note.trim().slice(0,300);
-      journal.sessions.unshift({id:newId(), date:new Date(draft.startedAt).toISOString(), kind:'cardio', dayId:draft.dayId || null, name:draft.name.trim() || 'Cardio', durationMin:Math.max(1, Math.round(sec/60)), cardio:out});
+      journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'cardio', dayId:draft.dayId || null, name:draft.name.trim() || 'Cardio', durationMin:Math.max(1, Math.round(sec/60)), cardio:out});
+      journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
       draft = null; saveDraft(); persist(); toast(`Séance enregistrée${out.km ? ' · ' + paceText(out.type, out.km, sec) : ''}`); go('semaine');
       break;
     }
@@ -2491,6 +2575,7 @@ document.addEventListener('change', e => {
     };
     rd.readAsText(f); t.value = '';
   }
+  else if(t.dataset.dd && draft){ if(t.dataset.dd === 'date') draft.day = t.value && t.value <= todayISO() ? t.value : todayISO(); else draft.dur = t.value; saveDraft(); }
   else if(t.dataset.p === 'ex' && t.dataset.field === 'same'){
     const x = findDay(t.dataset.day)?.exercises.find(y => y.id === t.dataset.ex);
     if(x){
