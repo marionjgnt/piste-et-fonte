@@ -740,6 +740,25 @@ function migrate(j){
   const out = {v:2, profile: j.profile || null, programme: j.programme || null, exMeta: (j.exMeta && typeof j.exMeta === 'object') ? j.exMeta : {}, sessions: []};
   (Array.isArray(j.sessions) ? j.sessions : []).forEach(s => out.sessions.push(Object.assign({kind:'muscu'}, s)));
   (Array.isArray(j.runs) ? j.runs : []).forEach(r => out.sessions.push({id:r.id, date:r.date, kind:'cardio', name:CARDIO_TYPES[r.type]?.label || 'Cardio', durationMin:Math.round(r.sec/60), cardio:{type:r.type, km:r.km, sec:r.sec}}));
+  // Nettoyage : remet au bon format les données anciennes ou incomplètes (rien n'est supprimé d'utile).
+  const toSets = sets => (Array.isArray(sets) ? sets : []).filter(x => x && typeof x === 'object').map(x => Object.assign({}, x, {reps: +x.reps || 0, kg: parseFloat(String(x.kg ?? '').replace(',','.')) || 0}));
+  out.sessions = out.sessions.filter(s => s && typeof s === 'object').map(s => {
+    const o = Object.assign({}, s);
+    if(!o.id) o.id = 's' + Math.random().toString(36).slice(2,9);
+    if(!o.date || isNaN(new Date(o.date))) o.date = new Date().toISOString();
+    o.name = String(o.name || (o.kind === 'cardio' ? 'Cardio' : 'Séance'));
+    if(o.kind === 'cardio'){ if(!o.cardio || typeof o.cardio !== 'object') o.cardio = {type:'autre', sec:(+o.durationMin || 0)*60}; }
+    else o.exercises = (Array.isArray(o.exercises) ? o.exercises : []).filter(e => e && typeof e === 'object').map(e => Object.assign({}, e, {name:String(e.name || 'Exercice'), sets:toSets(e.sets)})).filter(e => e.sets.length || o.circuit);
+    return o;
+  });
+  if(out.programme && typeof out.programme === 'object'){
+    out.programme.days = (Array.isArray(out.programme.days) ? out.programme.days : []).filter(d => d && typeof d === 'object').map(d => {
+      const o = Object.assign({}, d, {id: d.id || 'd' + Math.random().toString(36).slice(2,9), name: String(d.name || 'Séance'), kind: d.kind === 'cardio' ? 'cardio' : 'muscu'});
+      if(o.kind === 'cardio') o.cardio = Object.assign({type:'tapis', minutes:30, format:''}, o.cardio || {});
+      else o.exercises = (Array.isArray(o.exercises) ? o.exercises : []).filter(e => e && typeof e === 'object').map(e => Object.assign({}, e, {id: e.id || 'e' + Math.random().toString(36).slice(2,9), name: String(e.name || 'Exercice'), sets: +e.sets || 3}));
+      return o;
+    });
+  }else out.programme = null;
   out.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
   return out;
 }
@@ -812,7 +831,7 @@ function rythme(){
 }
 function restFor(name){
   const k = String(name).trim().toLowerCase();
-  for(const d of journal.programme?.days || []) for(const e of d.exercises || []) if(e.name.trim().toLowerCase() === k && e.rest != null) return +e.rest;
+  for(const d of journal.programme?.days || []) for(const e of d.exercises || []) if(String(e?.name || '').trim().toLowerCase() === k && e.rest != null) return +e.rest;
   return settings.rest || 90;
 }
 // Durée estimée exercice par exercice : répétitions × temps d'une répétition, installation, pauses entre séries, passage à l'exercice suivant.
@@ -895,7 +914,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.6.3';
+const APP_VERSION = '1.6.5';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1099,6 +1118,8 @@ function coachTip(E, k){
   }
   return {txt:`${f === 'dur' || f === 'max' ? 'Bien joué, tu es allé chercher tes limites.' : 'Exercice terminé, bravo !'} ${week}`.trim()};
 }
+const PATTERNS = {prog:{label:'Charge progressive', short:'Progressive', color:'var(--chart-a)'}, fixe:{label:'Charge fixe', short:'Fixe', color:'var(--chart-b)'}};
+function patternOf(sets){ return new Set((sets || []).map(x => +x.kg || 0).filter(v => v > 0)).size > 1 ? 'prog' : 'fixe'; }
 function lastExFor(name, pat){
   const n = String(name || '').trim().toLowerCase();
   for(const s of journal.sessions){
@@ -1728,7 +1749,7 @@ function viewProfil(){
   const hasBilan = !!p.goals?.length;
   const row = (l, v) => `<div><span>${l}</span><span>${v}</span></div>`;
   return `<button type="button" class="back" data-act="go" data-tab="activite">← Retour</button>
-  <div class="row" style="margin-top:8px;gap:14px"><div class="avatar-big">${esc(initial)}</div><div><h1>${esc(p.prenom || 'Mon profil')}</h1><p class="small muted">${hasBilan ? 'Bilan fait le ' + fmtDate(p.doneAt) : 'Pas encore de bilan'}</p></div></div>
+  <div class="row" style="margin-top:8px;gap:14px"><div class="avatar-big">${esc(initial)}</div><div><h1>${esc(p.prenom || 'Mon profil')}</h1><p class="small muted">${hasBilan ? 'Bilan fait le ' + fmtDate(p.doneAt) : 'Pas encore de bilan'} · version ${APP_VERSION}</p></div></div>
   <h2 class="sec">Mes infos</h2>
   <div class="card stack">
     <div class="field"><label for="pf-prenom">Prénom</label><input id="pf-prenom" data-pf="prenom" value="${esc(p.prenom || '')}" placeholder="Ton prénom" autocomplete="given-name"></div>
@@ -2289,7 +2310,7 @@ function viewProgres(){
     ${target}
   </svg>`;
   const best = {};
-  S.forEach(s => (s.exercises||[]).forEach(e => e.sets.forEach(x => {
+  S.forEach(s => (s.exercises||[]).forEach(e => (e.sets || []).forEach(x => {
     if(!(+x.kg > 0)) return;
     const b = best[e.name];
     if(!b || x.kg > b.kg || (x.kg === b.kg && x.reps > b.reps)) best[e.name] = {kg:+x.kg, reps:+x.reps, date:s.date};
