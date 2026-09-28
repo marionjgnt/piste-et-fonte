@@ -742,6 +742,7 @@ function migrate(j){
 }
 let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
+if(draft && (typeof draft !== 'object' || !draft.startedAt || (draft.kind === 'cardio' ? typeof draft.cardio !== 'object' : !Array.isArray(draft.exercises)))) draft = null;
 let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
 if(!['activite','conseils','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
@@ -891,7 +892,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1096,10 +1097,10 @@ function coachTip(E, k){
   return {txt:`${f === 'dur' || f === 'max' ? 'Bien joué, tu es allé chercher tes limites.' : 'Exercice terminé, bravo !'} ${week}`.trim()};
 }
 function lastExFor(name, pat){
-  const n = name.trim().toLowerCase();
+  const n = String(name || '').trim().toLowerCase();
   for(const s of journal.sessions){
-    const ex = (s.exercises||[]).find(e => e.name.trim().toLowerCase() === n);
-    if(ex && ex.sets.length && (!pat || patternOf(ex.sets) === pat)) return {date:s.date, sets:ex.sets};
+    const ex = (s.exercises||[]).find(e => String(e?.name || '').trim().toLowerCase() === n);
+    if(ex && Array.isArray(ex.sets) && ex.sets.length && (!pat || patternOf(ex.sets) === pat)) return {date:s.date, sets:ex.sets};
   }
   return null;
 }
@@ -1271,6 +1272,18 @@ function renderTabs(){
 function render(){ renderTabs(); renderView(); updatePill(); const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (journal.profile?.prenom || '?').trim().charAt(0).toUpperCase() || '?'; }
 function renderView(){
   const v = $('#view');
+  try{ renderViewInner(v); }
+  catch(err){
+    console.error(err);
+    v.innerHTML = `<div class="card stack" style="margin-top:10px">
+      <h3>Oups, cet écran n’a pas pu s’afficher</h3>
+      <p class="small muted">${draft ? 'Une séance en cours semble abîmée. Tu peux l’abandonner pour repartir proprement : tes séances déjà enregistrées ne sont pas touchées.' : 'Retourne à l’accueil et réessaie.'}</p>
+      <div class="row">${draft ? '<button type="button" class="btn primary" data-act="fix-draft">Abandonner la séance en cours</button>' : ''}<button type="button" class="btn" data-act="fix-home">Retour à l’accueil</button></div>
+      <p class="small muted" style="word-break:break-word">Détail technique : ${esc(String(err && err.message || err))}</p>
+    </div>`;
+  }
+}
+function renderViewInner(v){
   v.innerHTML = ({activite:viewActivite, conseils:viewConseils, semaine:viewSemaine, programme:viewProgramme, seance:viewSeance, chrono:viewChrono, archive:viewSuivi, profil:viewProfil, alimentation:viewAlim, progres:viewSuivi, suivi:viewSuivi}[tab] || viewActivite)();
   if(['semaine','programme','seance','suivi','conseils'].includes(tab) && !ui.test) v.insertAdjacentHTML('afterbegin', `<button type="button" class="back" data-act="go" data-tab="activite" style="margin-bottom:6px">← Mon activité</button>`);
   if(tab === 'seance' && draft?.kind === 'cardio') updatePace();
@@ -2093,6 +2106,8 @@ function viewSeance(){
       ${j.sessions.length > ui.histMore ? `<button type="button" class="btn wide ghost" data-act="more">Voir plus</button>` : ''}`; })()}`;
 }
 function viewMuscuDraft(){
+  if(!Array.isArray(draft.exercises)) draft.exercises = [];
+  draft.exercises.forEach(e => { e.name = String(e.name || 'Exercice'); if(!Array.isArray(e.sets) || !e.sets.length) e.sets = [{reps:'', kg:'', done:false}]; });
   const known = new Set([...COMMON_EX, ...journal.sessions.flatMap(s => (s.exercises||[]).map(e => e.name))]);
   return `<div class="stack">
     <div class="draft-head">
@@ -2145,6 +2160,7 @@ function paceText(type, km, sec){
   return `${fmtPace(sec / km)} /km`;
 }
 function viewCardioDraft(){
+  if(!draft.cardio) draft.cardio = {type:'tapis', minutes:'', format:'', h:'', m:'', s:'', km:'', rpe:'', note:''};
   const c = draft.cardio, hasUnit = !!CARDIO_TYPES[c.type]?.unit;
   return `<div class="stack">
     <div class="draft-head">
@@ -2620,7 +2636,7 @@ function startFromDay(day){
     startDraft({kind:'cardio', dayId:day.id, name:day.name, startedAt:Date.now(), cardio:{type:day.cardio?.type || 'tapis', minutes:day.cardio?.minutes || '', format:day.cardio?.format || '', h:'', m:'', s:'', km:'', rpe:'', note:''}});
     return;
   }
-  startDraft({kind:'muscu', dayId:day.id, name:day.name, startedAt:Date.now(), exercises: day.exercises.map(e => {
+  startDraft({kind:'muscu', dayId:day.id, name:day.name, startedAt:Date.now(), exercises: (day.exercises || []).filter(e => e && e.name).map(e => {
     const plan = e.varied && e.perSet?.length ? e.perSet : null;
     const prev = lastSetsFor(e.name, plan ? 'prog' : 'fixe');
     const timed = /s$/.test(String(e.reps).trim());
@@ -2653,6 +2669,8 @@ document.addEventListener('click', e => {
   unlockAudio();
   switch(act){
     case 'go': go(b.dataset.tab); break;
+    case 'fix-draft': draft = null; saveDraft(); restStop(); toast('Séance en cours abandonnée'); go('activite'); break;
+    case 'fix-home': go('activite'); break;
     case 'open-chrono': chronoMode = b.dataset.mode || 'repos'; LS.set('pf.chrono', chronoMode); go('chrono'); break;
     case 'more': ui.histMore += 20; renderView(); break;
 
