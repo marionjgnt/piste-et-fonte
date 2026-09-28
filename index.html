@@ -891,7 +891,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1055,40 +1055,46 @@ function advice(sets){
   return {cls:'keep', kind:'Reste', delta:0, txt:'C’était moyen : reste sur ce poids encore une semaine, tu progresses.'};
 }
 function coachTip(E, k){
+  // Pendant l'exercice : on ne parle que de répétitions. Le poids ne bouge que dans 2 cas :
+  // toutes les séries faciles depuis la 1re (dès 2 séries) → on propose d'augmenter,
+  // très dur à partir de la 3e série après une série déjà dure → on propose d'alléger.
   const sets = E.sets, s = sets[k], next = sets[k+1];
-  const kg = parseFloat(String(s.kg).replace(',','.')) || 0, reps = parseInt(s.reps) || 0;
-  const f = s.feel, done = sets.slice(0, k+1).map(x => x.feel).filter(Boolean);
+  const num = v => parseFloat(String(v ?? '').replace(',','.')) || 0;
+  const kg = num(s.kg), f = s.feel;
+  const feels = sets.slice(0, k+1).map(x => x.feel);
   const inc = kg >= 60 ? 5 : 2.5;
-  const nkg = next ? parseFloat(String(next.kg).replace(',','.')) || 0 : 0;
+  const nkg = next ? num(next.kg) : 0;
   if(next){
-    if(f === 'facile'){
-      if(nkg > kg) return {txt:`Facile ! Continue, la prochaine série monte à ${fmtN(nkg)} kg.`};
-      if(kg) return {txt:`Facile ! Tu peux mettre ${fmtN(kg + inc)} kg sur la prochaine série.`, act:'coach-next', kg:kg + inc, label:`Mettre ${fmtN(kg + inc)} kg`};
-      return {txt:'Facile ! Ajoute 1 à 2 répétitions sur la prochaine série.'};
+    if(k >= 1 && kg && feels.every(x => x === 'facile')){
+      const target = Math.max(nkg, kg) + inc;
+      return {txt:`${k+1} séries faciles d’affilée : tu peux passer à ${fmtN(target)} kg pour la série ${k+2}.`, act:'coach-next', kg:target, label:`Mettre ${fmtN(target)} kg`};
     }
-    if(f === 'bien') return {txt: nkg ? `Bonne zone, continue comme prévu : ${fmtN(nkg)} kg.` : 'Bonne zone, continue comme prévu.'};
-    if(f === 'dur'){
-      if(nkg > kg) return {txt:`Dur : reste à ${fmtN(kg)} kg sur la prochaine série au lieu de ${fmtN(nkg)}.`, act:'coach-next', kg, label:`Rester à ${fmtN(kg)} kg`};
-      return {txt:'Dur : garde la charge et vise les mêmes répétitions. Prends bien ton repos.'};
+    if(k >= 2 && f === 'max' && ['dur','max'].includes(feels[k-1]) && kg > 2.5){
+      const target = Math.min(nkg || kg, kg) - 2.5;
+      return {txt:`Encore très dur : baisse à ${fmtN(target)} kg pour la prochaine série, et fais tes répétitions proprement.`, act:'coach-next', kg:target, label:`Passer à ${fmtN(target)} kg`};
     }
-    if(kg > 2.5) return {txt:`Très dur : baisse à ${fmtN(Math.min(nkg || kg, kg) - 2.5)} kg pour la prochaine série et fais tes répétitions proprement.`, act:'coach-next', kg:Math.min(nkg || kg, kg) - 2.5, label:`Passer à ${fmtN(Math.min(nkg || kg, kg) - 2.5)} kg`};
-    return {txt:'Très dur : fais 1 à 2 répétitions de moins sur la prochaine série.'};
+    const planned = nkg > kg ? ` La prochaine série monte à ${fmtN(nkg)} kg, comme prévu.` : '';
+    if(f === 'facile') return {txt: planned ? `Facile !${planned}` : 'Facile ! Tu peux tenter 1 à 2 répétitions de plus sur la prochaine série.'};
+    if(f === 'bien') return {txt: planned ? `Bonne zone !${planned}` : 'Bonne zone, continue comme prévu.'};
+    if(f === 'dur') return {txt:`Dur : garde tes répétitions et prends bien ton repos.${planned}`};
+    return {txt:`Très dur : fais 1 à 2 répétitions de moins sur la prochaine série.${planned}`};
   }
-  // Dernière série de l'exercice
-  const allDone = sets.every(x => x.done);
-  if(allDone && done.length && !done.some(x => x === 'dur' || x === 'max') && sets.length < 8){
+  // Fin de l'exercice : bilan pour la semaine prochaine (+ série bonus si aucune série n'était dure).
+  const ad = advice(sets);
+  const week = !ad ? '' : ad.cls === 'up' ? `La semaine prochaine : augmente ${ad.delta ? `(+${fmtN(ad.delta)} kg)` : '(1 à 2 répétitions de plus)'}.`
+    : ad.cls === 'down' ? `La semaine prochaine : allège un peu ${ad.delta ? `(−${fmtN(Math.abs(ad.delta))} kg)` : '(1 à 2 répétitions de moins)'}.`
+    : 'La semaine prochaine : garde ce poids.';
+  const rated = feels.filter(Boolean);
+  if(sets.every(x => x.done) && rated.length && !rated.some(x => x === 'dur' || x === 'max') && sets.length < 8){
     const prev = sets[k-1];
-    const pkg = prev ? parseFloat(String(prev.kg).replace(',','.')) || 0 : 0, preps = prev ? parseInt(prev.reps) || 0 : 0;
+    const pkg = prev ? num(prev.kg) : 0, reps = parseInt(s.reps) || 0, preps = prev ? parseInt(prev.reps) || 0 : 0;
     const step = kg && pkg && kg > pkg ? kg - pkg : (kg ? inc : 0);
     const r = reps && preps > reps ? Math.max(1, reps - (preps - reps)) : reps;
     const xk = kg ? kg + step : 0;
-    return {txt:'Tu as encore de la marge : tente une série de plus !', act:'coach-extra', kg:xk, reps:r, label:`Ajouter ${xk ? fmtN(xk) + ' kg × ' : ''}${r || '?'}${xk ? '' : ' rép.'}`};
+    return {txt:`Exercice terminé. Tu as encore de la marge : tente une série bonus ! ${week}`, act:'coach-extra', kg:xk, reps:r, label:`Ajouter ${xk ? fmtN(xk) + ' kg × ' : ''}${r || '?'}${xk ? '' : ' rép.'}`};
   }
-  if(f === 'dur' || f === 'max') return {txt:'Bien joué, tu es allé chercher tes limites. Exercice terminé !'};
-  return {txt:'Exercice terminé, bravo !'};
+  return {txt:`${f === 'dur' || f === 'max' ? 'Bien joué, tu es allé chercher tes limites.' : 'Exercice terminé, bravo !'} ${week}`.trim()};
 }
-const PATTERNS = {prog:{label:'Charge progressive', short:'Progressive', color:'var(--chart-a)'}, fixe:{label:'Charge fixe', short:'Fixe', color:'var(--chart-b)'}};
-function patternOf(sets){ return new Set(sets.map(x => +x.kg || 0).filter(v => v > 0)).size > 1 ? 'prog' : 'fixe'; }
 function lastExFor(name, pat){
   const n = name.trim().toLowerCase();
   for(const s of journal.sessions){
