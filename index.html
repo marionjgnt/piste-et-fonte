@@ -918,7 +918,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.6.7';
+const APP_VERSION = '1.6.8';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -2705,7 +2705,9 @@ function startFromDay(day){
     const n = plan ? plan.length : (e.sets || 3);
     const sets = Array.from({length:n}, (_, i) => {
       const pl = plan?.[i], pv = prev?.[Math.min(i, (prev?.length || 1) - 1)];
-      const kg = pl && pl.kg !== '' && pl.kg != null ? pl.kg : (!plan && e.kg !== '' && e.kg != null ? e.kg : (pv ? pv.kg || '' : ''));
+      // On repart de ce qui a été fait la dernière fois (même type de séance) ; le programme ne sert qu'en l'absence d'historique.
+      const planned = pl && pl.kg !== '' && pl.kg != null ? pl.kg : (!plan && e.kg !== '' && e.kg != null ? e.kg : '');
+      const kg = pv && +pv.kg > 0 ? pv.kg : planned;
       return {reps: pl ? (parseInt(pl.reps) || '') : reps, kg, done:false};
     });
     return {name:e.name, rest:e.rest, target:{sets:n, reps:e.reps, plan, tempo:e.tempo, note:e.note}, sets};
