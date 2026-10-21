@@ -769,7 +769,7 @@ function migrate(j){
 let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 if(draft && (typeof draft !== 'object' || !draft.startedAt || (draft.kind === 'cardio' ? typeof draft.cardio !== 'object' : !Array.isArray(draft.exercises)))) draft = null;
-let settings = Object.assign({autoRest:true, rest:90}, LS.get('pf.settings', {}));
+let settings = Object.assign({autoRest:true, rest:90, loudTchin:true}, LS.get('pf.settings', {}));
 let tab = LS.get('pf.tab', 'semaine');
 if(!['activite','conseils','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
 tab = tab === 'alimentation' ? 'alimentation' : 'activite';
@@ -918,7 +918,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -996,7 +996,11 @@ function beep(freq=880, dur=.15, vol=.25){
 function tchin(){
   try{
     if(tchinEl){
-      const play = () => { tchinEl.muted = false; tchinEl.currentTime = 0; const pr = tchinEl.play(); if(pr && pr.catch){ pr.catch(() => tchinSynth()); return pr; } return Promise.resolve(); };
+      const play = () => {
+        // « Sonner même en mode silencieux » : on passe en lecteur audio juste le temps du tchin, puis on revient en mode discret.
+        if(settings.loudTchin){ try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){} clearTimeout(tchin.back); tchin.back = setTimeout(() => { try{ if(navigator.audioSession) navigator.audioSession.type = 'ambient'; }catch(e){} }, 2000); }
+        tchinEl.muted = false; tchinEl.currentTime = 0; const pr = tchinEl.play(); if(pr && pr.catch){ pr.catch(() => tchinSynth()); return pr; } return Promise.resolve();
+      };
       return tchinUnlocking ? tchinUnlocking.then(play) : play();
     }
   }catch(e){}
@@ -2336,6 +2340,7 @@ function viewChrono(){
     </div>
     <div class="card stack">
       <label class="toggle"><input type="checkbox" id="auto-rest2" data-act="auto-rest" ${settings.autoRest ? 'checked' : ''}> Démarrer le repos quand je valide une série</label>
+      <label class="toggle"><input type="checkbox" id="loud-tchin" data-act="loud-tchin" ${settings.loudTchin ? 'checked' : ''}> Sonner même en mode silencieux <span class="small muted">(peut mettre ta musique en pause un instant)</span></label>
       <button type="button" class="btn sm" data-act="test-tchin" style="align-self:flex-start">Écouter le tchin de fin de repos</button>
       <div class="field"><label for="rest-default">Repos par défaut (exercices sans repos défini)</label>
         <select id="rest-default" data-act="rest-default">${[45,60,90,120,150,180,240].map(s => `<option value="${s}" ${settings.rest===s?'selected':''}>${fmtRest(s)}</option>`).join('')}</select></div>
@@ -3072,6 +3077,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if(t.dataset.act === 'auto-rest'){ settings.autoRest = t.checked; saveSettings(); }
+  else if(t.dataset.act === 'loud-tchin'){ settings.loudTchin = t.checked; saveSettings(); }
   else if(t.dataset.act === 'rest-default'){ settings.rest = +t.value; saveSettings(); if(!rest.running){ rest.total = settings.rest; rest.left = settings.rest; } renderView(); }
   else if(t.dataset.iv) renderView();
   else if(t.dataset.c === 'type'){ draft.cardio.type = t.value; saveDraft(); renderView(); }
