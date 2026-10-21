@@ -918,7 +918,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.6.9';
+const APP_VERSION = '1.7.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -946,9 +946,44 @@ function setupUpdates(){
 
 /* ================= Son, vibration, écran ================= */
 let actx = null, wake = null;
-function unlockAudio(){
-  try{ if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; if(AC) actx = new AC(); } if(actx && actx.state === 'suspended') actx.resume(); }catch(e){}
+// Le « tchin » est un vrai petit fichier son (WAV fabriqué au démarrage) joué par un lecteur audio :
+// c'est la méthode la plus fiable sur iPhone, AirPods compris. Il doit être « déverrouillé » par un premier appui.
+let tchinEl = null, tchinReady = false, tchinUnlocking = null;
+function makeTchinWav(){
+  const sr = 44100, len = Math.floor(sr * 1.5), data = new Float32Array(len);
+  const strike = (t0, f, amp) => [[1, 1, 1.3], [2.76, .5, .7], [5.4, .28, .45], [8.93, .14, .3]].forEach(([mul, a, l]) => {
+    const s0 = Math.floor(t0 * sr), tau = l / 6.9, w = 2 * Math.PI * f * mul;
+    for(let i = 0; s0 + i < len; i++){ const t = i / sr; if(t > l) break; data[s0 + i] += amp * a * Math.min(1, t / .004) * Math.exp(-t / tau) * Math.sin(w * t); }
+  });
+  strike(.02, 1760, .5); strike(.14, 2217, .38);
+  let peak = 0; for(let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(data[i]));
+  const g = peak ? .9 / peak : 1, buf = new ArrayBuffer(44 + len * 2), dv = new DataView(buf);
+  const str = (o, txt) => { for(let i = 0; i < txt.length; i++) dv.setUint8(o + i, txt.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + len * 2, true); str(8, 'WAVE'); str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, len * 2, true);
+  for(let i = 0; i < len; i++) dv.setInt16(44 + i * 2, Math.round(Math.max(-1, Math.min(1, data[i] * g)) * 32767), true);
+  return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
 }
+function unlockAudio(){
+  try{ if(navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; }catch(e){}
+  try{
+    if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; if(AC) actx = new AC(); }
+    if(actx && actx.state !== 'running') actx.resume();
+    if(actx){ const b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start(0); }
+  }catch(e){}
+  try{
+    if(!tchinEl){ tchinEl = new Audio(); tchinEl.setAttribute('playsinline', ''); tchinEl.preload = 'auto'; tchinEl.src = makeTchinWav(); }
+    if(!tchinReady && !tchinUnlocking){
+      tchinEl.muted = true;
+      const pr = tchinEl.play();
+      if(pr && pr.then) tchinUnlocking = pr.then(() => { tchinEl.pause(); tchinEl.currentTime = 0; tchinReady = true; })
+        .catch(() => {}).finally(() => { tchinEl.muted = false; tchinUnlocking = null; });
+      else tchinEl.muted = false;
+    }
+  }catch(e){}
+}
+document.addEventListener('touchend', unlockAudio, {passive:true});
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') tchinReady = false; });
 function beep(freq=880, dur=.15, vol=.25){
   if(!actx) return;
   try{
@@ -959,6 +994,15 @@ function beep(freq=880, dur=.15, vol=.25){
 }
 // « Tchin » : deux tintements de verre (cloche synthétisée avec des harmoniques inharmoniques qui s'éteignent vite).
 function tchin(){
+  try{
+    if(tchinEl){
+      const play = () => { tchinEl.muted = false; tchinEl.currentTime = 0; const pr = tchinEl.play(); if(pr && pr.catch){ pr.catch(() => tchinSynth()); return pr; } return Promise.resolve(); };
+      return tchinUnlocking ? tchinUnlocking.then(play) : play();
+    }
+  }catch(e){}
+  tchinSynth(); return Promise.reject(new Error('lecteur indisponible'));
+}
+function tchinSynth(){
   if(!actx) return;
   try{
     const t0 = actx.currentTime + .02, master = actx.createGain();
@@ -2750,7 +2794,7 @@ document.addEventListener('click', e => {
     case 'go': go(b.dataset.tab); break;
     case 'fix-draft': draft = null; saveDraft(); restStop(); toast('Séance en cours abandonnée'); go('activite'); break;
     case 'fix-home': go('activite'); break;
-    case 'test-tchin': unlockAudio(); setTimeout(tchin, 60); break;
+    case 'test-tchin': { unlockAudio(); const pr = tchin(); if(pr && pr.then) pr.then(() => toast('Tchin joué ✅ (monte le volume si tu n’entends rien)', 4000)).catch(err => toast('Son bloqué par l’iPhone : ' + (err && (err.name || err.message) || 'inconnu'), 6000)); break; }
     case 'open-chrono': chronoMode = b.dataset.mode || 'repos'; LS.set('pf.chrono', chronoMode); go('chrono'); break;
     case 'more': ui.histMore += 20; renderView(); break;
 
