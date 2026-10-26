@@ -769,7 +769,8 @@ function migrate(j){
 let journal = migrate(LS.get('pf.journal', null));
 let draft = LS.get('pf.draft', null);
 if(draft && (typeof draft !== 'object' || !draft.startedAt || (draft.kind === 'cardio' ? typeof draft.cardio !== 'object' : !Array.isArray(draft.exercises)))) draft = null;
-let settings = Object.assign({autoRest:true, rest:90, loudTchin:true}, LS.get('pf.settings', {}));
+let settings = Object.assign({autoRest:true, rest:90, loudTchin:false}, LS.get('pf.settings', {}));
+if(settings.tchinV !== 2){ settings.loudTchin = false; settings.tchinV = 2; LS.set('pf.settings', settings); }
 let tab = LS.get('pf.tab', 'semaine');
 if(!['activite','conseils','semaine','programme','seance','chrono','archive','progres','profil','alimentation','suivi'].includes(tab)) tab = 'semaine';
 tab = tab === 'alimentation' ? 'alimentation' : 'activite';
@@ -918,7 +919,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1234,6 +1235,14 @@ function lastSetsFor(name, pat){
 }
 function draftPat(e){ return e.target?.plan ? 'prog' : e.target ? 'fixe' : patternOf(e.sets); }
 function hasBothPatterns(name){ return !!(lastExFor(name, 'prog') && lastExFor(name, 'fixe')); }
+// Objectif affiché pendant la séance = ce qu'il y a dans les cases (charges et répétitions), mis à jour en direct.
+function objText(e){
+  const sets = e.sets || [];
+  const fmt = x => { const kg = parseFloat(String(x.kg ?? '').replace(',','.')); return `${kg > 0 ? fmtN(kg) + ' kg × ' : ''}${x.reps || '?'}`; };
+  const same = sets.length && sets.every(x => String(x.kg) === String(sets[0].kg) && String(x.reps) === String(sets[0].reps));
+  if(same){ const kg = parseFloat(String(sets[0].kg ?? '').replace(',','.')); return `${sets.length} × ${sets[0].reps || e.target?.reps || '?'}${kg > 0 ? ' · ' + fmtN(kg) + ' kg' : ''}`; }
+  return sets.map(fmt).join(', ');
+}
 const planText = plan => plan.map(p => `${p.kg !== '' && p.kg != null ? fmtN(+p.kg) + ' kg' : '–'} × ${p.reps || '?'}`).join(', ');
 const setsText = sets => sets.map(x => x.kg ? `${fmtN(x.kg)} kg × ${x.reps}` : `${x.reps} rép.`).join(', ');
 const volume = s => (s.exercises||[]).reduce((a,e) => a + e.sets.reduce((b,x) => b + (+x.reps||0)*(+x.kg||0), 0), 0);
@@ -2239,7 +2248,7 @@ function viewMuscuDraft(){
       return `<article class="ex">
         <header><h3>${esc(e.name)}</h3><div class="acts"><button type="button" class="btn sm ghost" data-act="dx-skip" data-ex="${i}">Sauter</button><button type="button" class="btn sm ghost" data-act="dx-remove" data-ex="${i}">Retirer</button></div></header>
         ${exMetaOf(e.name).setting ? `<p class="small" style="margin:2px 0 0"><span class="chip">Réglage : ${esc(exMetaOf(e.name).setting)}</span></p>` : ''}
-        <p class="target num">${t ? (t.plan ? `Objectif <b>${esc(planText(t.plan))}</b> · ` : `Objectif <b>${t.sets} × ${esc(t.reps)}</b> · `) : ''}repos <b>${fmtRest(e.rest ?? settings.rest)}</b>${t?.tempo ? ` · ${esc(t.tempo)}` : ''}${t?.note ? `<br><i>${esc(t.note)}</i>` : ''}</p>
+        <p class="target num">${t ? `Objectif <b id="obj-${i}">${esc(objText(e))}</b> · ` : ''}repos <b>${fmtRest(e.rest ?? settings.rest)}</b>${t?.tempo ? ` · ${esc(t.tempo)}` : ''}${t?.note ? `<br><i>${esc(t.note)}</i>` : ''}</p>
         <div class="set-row head"><span>Série</span><span>${repsPerSide(e.name) ? 'Rép. / côté' : 'Répét.'}</span><span>${exMetaOf(e.name).perSide ? 'kg / côté' : 'Charge (kg)'}</span><span></span></div>
         ${e.sets.map((s,k) => `<div class="set-row${s.done ? ' done' : ''}">
           <span class="n">${k+1}</span>
@@ -2340,7 +2349,7 @@ function viewChrono(){
     </div>
     <div class="card stack">
       <label class="toggle"><input type="checkbox" id="auto-rest2" data-act="auto-rest" ${settings.autoRest ? 'checked' : ''}> Démarrer le repos quand je valide une série</label>
-      <label class="toggle"><input type="checkbox" id="loud-tchin" data-act="loud-tchin" ${settings.loudTchin ? 'checked' : ''}> Sonner même en mode silencieux <span class="small muted">(peut mettre ta musique en pause un instant)</span></label>
+      <label class="toggle"><input type="checkbox" id="loud-tchin" data-act="loud-tchin" ${settings.loudTchin ? 'checked' : ''}> Sonner même en mode silencieux <span class="small muted">(coupe ta musique un instant)</span></label>
       <button type="button" class="btn sm" data-act="test-tchin" style="align-self:flex-start">Écouter le tchin de fin de repos</button>
       <div class="field"><label for="rest-default">Repos par défaut (exercices sans repos défini)</label>
         <select id="rest-default" data-act="rest-default">${[45,60,90,120,150,180,240].map(s => `<option value="${s}" ${settings.rest===s?'selected':''}>${fmtRest(s)}</option>`).join('')}</select></div>
@@ -2952,6 +2961,14 @@ document.addEventListener('click', e => {
       if(!exercises.length){ ui.msg = skippedNames.length && skippedNames.length === draft.exercises.length ? 'Tous les exercices sont sautés : abandonne la séance ou remplis au moins une série.' : 'Remplis au moins une série (nombre de répétitions) avant d’enregistrer.'; renderView(); break; }
       journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin: +draft.dur || Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), ...(+draft.dur ? {durSet:true} : {}), ...(skippedNames.length ? {skipped:skippedNames} : {}), exercises});
       journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
+      // Le programme suit les charges que tu viens de faire (même jour du programme).
+      const pday = draft.dayId && findDay(draft.dayId);
+      if(pday) exercises.forEach(done => {
+        const pe = (pday.exercises || []).find(x => exKey(x.name) === exKey(done.name)); if(!pe) return;
+        const kgs = done.sets.map(x => +x.kg || 0);
+        if(pe.varied && pe.perSet?.length) pe.perSet.forEach((ps, k) => { const v = kgs[Math.min(k, kgs.length - 1)]; if(v > 0) ps.kg = String(v); });
+        else if(kgs.some(v => v > 0)) pe.kg = String(Math.max(...kgs));
+      });
       draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('activite');
       break;
     }
@@ -3044,7 +3061,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if(t.dataset.f && draft?.exercises){
     const s = draft.exercises[+t.dataset.ex]?.sets[+t.dataset.set];
-    if(s){ s[t.dataset.f] = t.value; saveDraft(); }
+    if(s){ s[t.dataset.f] = t.value; saveDraft(); const E = draft.exercises[+t.dataset.ex], ob = document.getElementById('obj-' + t.dataset.ex); if(ob && E && t.dataset.f !== 'note') ob.textContent = objText(E); }
   }else if(t.id === 'draft-name' && draft){ draft.name = t.value; saveDraft(); }
   else if(t.dataset.c && draft?.cardio){ draft.cardio[t.dataset.c] = t.value; saveDraft(); updatePace(); }
   else if(t.dataset.ta && ui.test){ const k = t.dataset.ta; ui.test.a[k] = k === 'prenom' ? t.value.slice(0,30) : k === 'notes' ? t.value.slice(0,600) : t.value; const nb = document.querySelector('[data-act="t-next"]'); if(nb) nb.disabled = !testValid(ui.test); }
