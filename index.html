@@ -919,7 +919,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.7.2';
+const APP_VERSION = '1.7.3';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -2490,6 +2490,44 @@ const exKey = n => String(n || '').trim().toLowerCase();
 function setExMeta(name, patch){ const k = exKey(name); journal.exMeta[k] = Object.assign({}, journal.exMeta[k], patch); }
 function repsPerSide(name){ const m = exMetaOf(name); return m.repsPerSide === undefined ? UNILATERAL.includes(exKey(name)) : !!m.repsPerSide; }
 function exMetaOf(name){ return (journal.exMeta || {})[exKey(name)] || {}; }
+/* ---------- Même exercice sur plusieurs jours : les charges suivent ---------- */
+const kgNum = v => { const n = parseFloat(String(v ?? '').replace(',','.')); return isFinite(n) && n > 0 ? n : null; };
+const exWeights = x => x.varied && x.perSet?.length ? x.perSet.map(p => kgNum(p.kg)) : [kgNum(x.kg)];
+const topKg = w => { const v = w.filter(x => x != null); return v.length ? Math.max(...v) : null; };
+const kgStr = v => String(Math.max(0, Math.round(v*100)/100));
+// Reporte la variation de charge (ex. +5 kg) sur le même exercice des autres jours du programme.
+// idx = numéro de la série modifiée (éditeur série par série), sinon null.
+function syncSameEx(srcDayId, name, oldW, newW, idx = null){
+  const P = journal.programme; if(!P?.days) return 0;
+  const key = exKey(name); let n = 0;
+  P.days.forEach(d => { if(d.id === srcDayId) return; (d.exercises || []).forEach(x => {
+    if(exKey(x.name) !== key) return;
+    const varied = !!(x.varied && x.perSet?.length), tw = exWeights(x);
+    let changed = false;
+    const shift = (j, dlt) => {
+      if(!dlt) return;
+      if(varied){ const ps = x.perSet[j]; const v = ps && kgNum(ps.kg); if(v != null){ ps.kg = kgStr(v + dlt); changed = true; } }
+      else{ const v = kgNum(x.kg); if(v != null){ x.kg = kgStr(v + dlt); changed = true; } }
+    };
+    if(tw.every(v => v == null)){
+      // Pas encore de charge sur l'autre jour : on recopie simplement.
+      if(varied) x.perSet.forEach((ps, j) => { const v = newW[Math.min(j, newW.length - 1)]; if(v != null){ ps.kg = kgStr(v); changed = true; } });
+      else{ const t = topKg(newW); if(t != null){ x.kg = kgStr(t); changed = true; } }
+    }else if(idx != null && newW.length > 1){
+      if(oldW[idx] == null || newW[idx] == null) return;
+      if(varied){ if(idx < x.perSet.length) shift(idx, newW[idx] - oldW[idx]); }
+      else if(topKg(oldW) != null && topKg(newW) != null) shift(0, topKg(newW) - topKg(oldW));
+    }else if(varied && oldW.length > 1 && oldW.length === x.perSet.length){
+      oldW.forEach((o, j) => { if(o != null && newW[j] != null) shift(j, newW[j] - o); });
+    }else{
+      const a = topKg(oldW), b = topKg(newW); if(a == null || b == null) return;
+      if(varied) x.perSet.forEach((_, j) => shift(j, b - a)); else shift(0, b - a);
+    }
+    if(changed) n++;
+  }); });
+  return n;
+}
+const syncMsg = n => n ? ` · charges reportées sur ${n} autre${n > 1 ? 's' : ''} séance${n > 1 ? 's' : ''}` : '';
 function exerciseIndex(sessions){
   const idx = {};
   sessions.forEach(s => (s.exercises || []).forEach(e => {
@@ -2962,14 +3000,15 @@ document.addEventListener('click', e => {
       journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'muscu', dayId:draft.dayId || null, name:draft.name.trim() || 'Séance', durationMin: +draft.dur || Math.max(1, Math.round((Date.now()-draft.startedAt)/60000)), ...(+draft.dur ? {durSet:true} : {}), ...(skippedNames.length ? {skipped:skippedNames} : {}), exercises});
       journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
       // Le programme suit les charges que tu viens de faire (même jour du programme).
-      const pday = draft.dayId && findDay(draft.dayId);
+      const pday = draft.dayId && findDay(draft.dayId); let synced = 0;
       if(pday) exercises.forEach(done => {
         const pe = (pday.exercises || []).find(x => exKey(x.name) === exKey(done.name)); if(!pe) return;
-        const kgs = done.sets.map(x => +x.kg || 0);
+        const oldW = exWeights(pe), kgs = done.sets.map(x => +x.kg || 0);
         if(pe.varied && pe.perSet?.length) pe.perSet.forEach((ps, k) => { const v = kgs[Math.min(k, kgs.length - 1)]; if(v > 0) ps.kg = String(v); });
         else if(kgs.some(v => v > 0)) pe.kg = String(Math.max(...kgs));
+        synced += syncSameEx(pday.id, pe.name, oldW, exWeights(pe));
       });
-      draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée'); go('activite');
+      draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée' + syncMsg(synced)); go('activite');
       break;
     }
     case 'finish-cardio': {
@@ -3091,8 +3130,25 @@ document.addEventListener('input', e => {
     persistSoon();
   }
 });
+let kgEdit = null;
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if(t.dataset?.p && (t.dataset.p === 'ex' || t.dataset.p === 'set') && t.dataset.field === 'kg'){
+    const x = findDay(t.dataset.day)?.exercises.find(y => y.id === t.dataset.ex);
+    kgEdit = x ? {day:t.dataset.day, ex:x.id, w:exWeights(x)} : null;
+  }
+});
 document.addEventListener('change', e => {
   const t = e.target;
+  if(t.dataset.p && (t.dataset.p === 'ex' || t.dataset.p === 'set') && t.dataset.field === 'kg' && kgEdit && kgEdit.day === t.dataset.day && kgEdit.ex === t.dataset.ex){
+    const x = findDay(t.dataset.day)?.exercises.find(y => y.id === t.dataset.ex);
+    if(x){
+      const newW = exWeights(x), n = syncSameEx(t.dataset.day, x.name, kgEdit.w, newW, t.dataset.p === 'set' ? +t.dataset.i : null);
+      kgEdit.w = newW; persist();
+      if(n) toast('Charge reportée' + syncMsg(n).replace(' · charges reportées', ''));
+      return;
+    }
+  }
   if(t.dataset.act === 'auto-rest'){ settings.autoRest = t.checked; saveSettings(); }
   else if(t.dataset.act === 'loud-tchin'){ settings.loudTchin = t.checked; saveSettings(); }
   else if(t.dataset.act === 'rest-default'){ settings.rest = +t.value; saveSettings(); if(!rest.running){ rest.total = settings.rest; rest.left = settings.rest; } renderView(); }
