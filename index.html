@@ -357,6 +357,8 @@ details.card[open] > summary::after{content:" ▾"}
 .toggle input{width:22px;height:22px;accent-color:var(--accent);flex:none}
 .pace-out{display:flex;justify-content:space-between;align-items:baseline;padding:12px 14px;border-radius:12px;background:var(--lane-soft);color:var(--lane)}
 .pace-out b{font-family:var(--display);font-size:26px;font-weight:600}
+.cblock{display:flex;flex-direction:column;gap:12px}
+.cblock + .cblock{border-top:1px solid var(--line);padding-top:14px}
 
 /* Progrès */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -692,7 +694,7 @@ const FOCUS_ORDER = ['bas','haut','full','push','pull','cardio'];
 const CARDIO_TYPES = {
   crossfit:{label:'CrossFit / WOD'}, tapis:{label:'Tapis de course', unit:'km'}, course:{label:'Course dehors', unit:'km'},
   velo:{label:'Vélo', unit:'km/h'}, rameur:{label:'Rameur', unit:'500m'}, natation:{label:'Natation', unit:'100m'},
-  marche:{label:'Marche', unit:'km'}, hiit:{label:'HIIT / corde à sauter'}, autre:{label:'Autre'}
+  marche:{label:'Marche', unit:'km'}, hiit:{label:'HIIT / corde à sauter'}, abdos:{label:'Abdos / gainage'}, autre:{label:'Autre'}
 };
 const EQUIP = {salle:{label:'Salle de sport', sub:'Barres, machines, poulies'}, halteres:{label:'Haltères à la maison', sub:'Haltères, banc, élastiques'}, pdc:{label:'Poids du corps', sub:'Sans matériel'}};
 const DURATIONS = [30,45,60,75,90,105,120];
@@ -879,9 +881,19 @@ function effMinutes(s){
   const est = estMinutes(s), d = +s.durationMin || 0;
   return Math.round(d >= est * 0.5 && d <= est * 2.5 ? d : est);
 }
-const MET = {crossfit:8, hiit:8, velo:7, rameur:7, natation:7, marche:3.5, course:9, tapis:9, autre:5};
+const MET = {crossfit:8, hiit:8, velo:7, rameur:7, natation:7, marche:3.5, course:9, tapis:9, abdos:4, autre:5};
+// Une séance cardio peut enchaîner plusieurs exercices (ex. tapis puis abdos) : cardio.parts.
+const cardioParts = s => { const c = s.cardio || {}; return Array.isArray(c.parts) && c.parts.length ? c.parts : [{type:c.type, sec:+c.sec || 0, km:c.km}]; };
+function partKcal(p, kg){
+  const km = +p.km || 0;
+  if(km && (p.type === 'course' || p.type === 'tapis')) return km * kg * 1.0;
+  if(km && p.type === 'marche') return km * kg * 0.55;
+  return (MET[p.type] || 5) * kg * (+p.sec || 0) / 3600;
+}
+const partsText = parts => parts.map(p => `${CARDIO_TYPES[p.type]?.label || 'Cardio'} ${fmtClock(p.sec || 0)}${p.km ? ` · ${fmtN(p.km)} km` : ''}`).join(' + ');
 function kcalOf(s, kg){
   kg = +kg || 65;
+  if(s.kind === 'cardio' && s.cardio?.parts?.length) return s.cardio.parts.reduce((a, p) => a + partKcal(p, kg), 0);
   if(s.kind === 'cardio'){
     const c = s.cardio || {}, km = +c.km || 0;
     if(km && (c.type === 'course' || c.type === 'tapis')) return km * kg * 1.0;
@@ -898,7 +910,7 @@ function weekStats(sessions, key){
     muscu: s.filter(x => x.kind !== 'cardio').length,
     cardio: s.filter(x => x.kind === 'cardio').length,
     total: s.length,
-    km: Math.round(s.reduce((a,x) => a + (+x.cardio?.km || 0), 0)*10)/10,
+    km: Math.round(s.reduce((a,x) => a + (x.kind === 'cardio' ? cardioParts(x).reduce((b,p) => b + (+p.km || 0), 0) : 0), 0)*10)/10,
     minutes: Math.round(s.reduce((a,x) => a + effMinutes(x), 0))
   };
 }
@@ -919,7 +931,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.8.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1481,7 +1493,7 @@ function viewTest(){
       <span class="n num">${a.weekly[f]}</span>
       <button type="button" class="btn icon" data-act="t-count" data-f="${f}" data-d="1" aria-label="Plus" ${tot >= 10 ? 'disabled' : ''}>+</button>
     </div>`).join('')}</div>
-    ${a.weekly.cardio ? `<h2 class="sec">Ton cardio, c’est plutôt…</h2><div class="pills">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>` : ''}`;
+    ${a.weekly.cardio ? `<h2 class="sec">Ton cardio, c’est plutôt…</h2><div class="pills">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre' && k !== 'abdos').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>` : ''}`;
   }else if(st === 'toi'){
     body = `<h1>Parle-moi de toi</h1><p class="lead">Ça sert à adapter le volume, les charges de départ et les temps de repos.</p>
     <h2 class="sec">Sexe</h2><div class="pills">${Object.entries(SEXES).map(([k,l]) => pill('sexe', k, l)).join('')}</div>
@@ -1542,7 +1554,7 @@ function viewTest(){
     <div class="choices" style="margin-top:16px">${Object.entries(EQUIP2).map(([k,[l,sub]]) => multi('equip', k, l, sub)).join('')}</div>`;
   }else if(st === 'cardio'){
     body = `<h1>Ton cardio</h1><p class="lead">Qu’est-ce que tu aimes faire ? Choix multiples.</p>
-    <div class="pills" style="margin-top:16px">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>`;
+    <div class="pills" style="margin-top:16px">${Object.entries(CARDIO_TYPES).filter(([k]) => k !== 'autre' && k !== 'abdos').map(([k,c]) => `<button type="button" class="pill" data-act="t-multi" data-k="cardioTypes" data-v="${k}" aria-pressed="${a.cardioTypes.includes(k)}">${c.label}</button>`).join('')}</div>`;
   }else if(st === 'limites'){
     body = `<h1>Douleurs ou blessures</h1><p class="lead">Les exercices qui sollicitent ces zones seront écartés de ton programme.</p>
     <div class="choices" style="margin-top:16px">${Object.entries(LIMITS).map(([k,l]) => multi('limits', k, l, '')).join('')}</div>
@@ -2191,7 +2203,9 @@ function sessionItem(s, demo){
   let meta;
   if(s.kind === 'cardio'){
     const c = s.cardio || {};
-    meta = `${CARDIO_TYPES[c.type]?.label || 'Cardio'} · ${fmtClock(c.sec || 0)}${c.km ? ` · ${fmtN(c.km)} km · ${paceText(c.type, c.km, c.sec)}` : ''}${c.rpe ? ` · ressenti ${c.rpe}/10` : ''}`;
+    meta = c.parts?.length > 1
+      ? `${esc(partsText(c.parts))} · total ${fmtClock(c.sec || 0)}${c.rpe ? ` · ressenti ${c.rpe}/10` : ''}`
+      : `${CARDIO_TYPES[c.type]?.label || 'Cardio'} · ${fmtClock(c.sec || 0)}${c.km ? ` · ${fmtN(c.km)} km · ${paceText(c.type, c.km, c.sec)}` : ''}${c.rpe ? ` · ressenti ${c.rpe}/10` : ''}`;
   }else if(s.circuit){
     meta = `Circuit · ${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s · ${fmtHM(effMinutes(s))}`;
   }else{
@@ -2289,7 +2303,7 @@ function paceText(type, km, sec){
 }
 function viewCardioDraft(){
   if(!draft.cardio) draft.cardio = {type:'tapis', minutes:'', format:'', h:'', m:'', s:'', km:'', rpe:'', note:''};
-  const c = draft.cardio, hasUnit = !!CARDIO_TYPES[c.type]?.unit;
+  const c = draft.cardio, blocks = cBlocks(c);
   return `<div class="stack">
     <div class="draft-head">
       <label class="small muted" for="draft-name">Séance cardio</label>
@@ -2298,15 +2312,10 @@ function viewCardioDraft(){
     </div>
     ${c.format ? `<div class="planned"><b>Au programme</b> · ${c.minutes ? fmtHM(c.minutes) + ' · ' : ''}${esc(c.format)}</div>` : ''}
     <div class="card stack">
-      <div class="field"><label for="c-type">Activité</label><select id="c-type" data-c="type">${Object.entries(CARDIO_TYPES).map(([k,v]) => `<option value="${k}" ${c.type===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
-      <div class="fields">
-        <div class="field" style="flex:0 1 70px"><label for="c-h">h</label><input id="c-h" type="number" inputmode="numeric" min="0" data-c="h" value="${esc(c.h)}" placeholder="0"></div>
-        <div class="field" style="flex:0 1 70px"><label for="c-m">min</label><input id="c-m" type="number" inputmode="numeric" min="0" max="59" data-c="m" value="${esc(c.m)}" placeholder="30"></div>
-        <div class="field" style="flex:0 1 70px"><label for="c-s">s</label><input id="c-s" type="number" inputmode="numeric" min="0" max="59" data-c="s" value="${esc(c.s)}" placeholder="0"></div>
-        ${hasUnit ? `<div class="field" style="flex:1 1 110px"><label for="c-km">Distance (km)</label><input id="c-km" type="number" inputmode="decimal" min="0" step="0.01" data-c="km" value="${esc(c.km)}" placeholder="5,0"></div>` : ''}
-      </div>
-      ${(sw.acc || sw.running) ? `<button type="button" class="btn sm" id="sw-use" data-act="sw-use">Reprendre le temps du chrono</button>` : `<button type="button" class="btn sm" data-act="sw-go">Lancer le chrono</button>`}
-      ${hasUnit ? `<div class="pace-out"><span id="c-pace-l">Allure</span><b class="num" id="c-pace">–</b></div>` : ''}
+      ${blocks.map((b, i) => cardioBlock(b, i, blocks.length)).join('')}
+      <button type="button" class="btn sm" data-act="cb-add">+ Ajouter un exercice</button>
+      ${blocks.length > 1 ? `<div class="pace-out"><span>Total</span><b class="num" id="c-total">${fmtClock(blocks.reduce((a, b) => a + cardioSec(b), 0))}</b></div>` : ''}
+      ${(sw.acc || sw.running) ? `<button type="button" class="btn sm" id="sw-use" data-act="sw-use">Reprendre le temps du chrono${blocks.length > 1 ? ` (exercice ${blocks.length})` : ''}</button>` : `<button type="button" class="btn sm" data-act="sw-go">Lancer le chrono</button>`}
       <div class="field"><label>Ressenti de l’effort (1 = facile, 10 = à fond)</label>
         <div class="rpe">${Array.from({length:10}, (_,i) => `<button type="button" data-act="rpe" data-v="${i+1}" aria-pressed="${+c.rpe === i+1}">${i+1}</button>`).join('')}</div></div>
       <div class="field"><label for="c-note">Notes (WOD, sensations…)</label><textarea id="c-note" data-c="note" placeholder="Ex. : AMRAP 20 min, 6 tours + 12 reps">${esc(c.note)}</textarea></div>
@@ -2324,11 +2333,32 @@ function viewCardioDraft(){
   </div>`;
 }
 const cardioSec = c => (+c.h||0)*3600 + (+c.m||0)*60 + (+c.s||0);
+// Exercice 1 = draft.cardio lui-même (compatibilité), les suivants dans draft.cardio.more.
+const cBlocks = c => [c, ...(Array.isArray(c.more) ? c.more : [])];
+const cBlock = (c, i) => +i ? c.more?.[+i - 1] : c;
+function cardioBlock(b, i, n){
+  const hasUnit = !!CARDIO_TYPES[b.type]?.unit, id = k => `c-${k}-${i}`;
+  return `<div class="cblock">
+    ${n > 1 ? `<div class="row" style="justify-content:space-between"><span class="small muted">Exercice ${i + 1}</span><button type="button" class="btn sm ghost" data-act="cb-del" data-b="${i}">Retirer</button></div>` : ''}
+    <div class="field"><label for="${id('type')}">Activité</label><select id="${id('type')}" data-c="type" data-b="${i}">${Object.entries(CARDIO_TYPES).map(([k,v]) => `<option value="${k}" ${b.type===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+    <div class="fields">
+      <div class="field" style="flex:0 1 70px"><label for="${id('h')}">h</label><input id="${id('h')}" type="number" inputmode="numeric" min="0" data-c="h" data-b="${i}" value="${esc(b.h)}" placeholder="0"></div>
+      <div class="field" style="flex:0 1 70px"><label for="${id('m')}">min</label><input id="${id('m')}" type="number" inputmode="numeric" min="0" max="59" data-c="m" data-b="${i}" value="${esc(b.m)}" placeholder="${i ? '15' : '30'}"></div>
+      <div class="field" style="flex:0 1 70px"><label for="${id('s')}">s</label><input id="${id('s')}" type="number" inputmode="numeric" min="0" max="59" data-c="s" data-b="${i}" value="${esc(b.s)}" placeholder="0"></div>
+      ${hasUnit ? `<div class="field" style="flex:1 1 110px"><label for="${id('km')}">Distance (km)</label><input id="${id('km')}" type="number" inputmode="decimal" min="0" step="0.01" data-c="km" data-b="${i}" value="${esc(b.km)}" placeholder="5,0"></div>` : ''}
+    </div>
+    ${hasUnit ? `<div class="pace-out"><span id="${id('pace-l')}">Allure</span><b class="num" id="${id('pace')}">–</b></div>` : ''}
+  </div>`;
+}
 function updatePace(){
   if(!draft?.cardio) return;
-  const c = draft.cardio, u = CARDIO_TYPES[c.type]?.unit;
-  setText('c-pace-l', u === 'km/h' ? 'Vitesse moyenne' : 'Allure moyenne');
-  setText('c-pace', paceText(c.type, parseFloat(String(c.km).replace(',','.')), cardioSec(c)));
+  const bl = cBlocks(draft.cardio);
+  bl.forEach((b, i) => {
+    const u = CARDIO_TYPES[b.type]?.unit; if(!u) return;
+    setText(`c-pace-l-${i}`, u === 'km/h' ? 'Vitesse moyenne' : 'Allure moyenne');
+    setText(`c-pace-${i}`, paceText(b.type, parseFloat(String(b.km).replace(',','.')), cardioSec(b)));
+  });
+  if(bl.length > 1) setText('c-total', fmtClock(bl.reduce((a, b) => a + cardioSec(b), 0)));
 }
 
 /* ---------- Chrono ---------- */
@@ -2422,7 +2452,7 @@ function viewProgres(){
     if(!b || x.kg > b.kg || (x.kg === b.kg && x.reps > b.reps)) best[e.name] = {kg:+x.kg, reps:+x.reps, date:s.date};
   })));
   const recs = Object.entries(best).sort((a,b) => b[1].kg - a[1].kg).slice(0,6);
-  const runs = S.filter(s => s.kind === 'cardio' && ['course','tapis'].includes(s.cardio?.type) && s.cardio.km >= 5);
+  const runs = S.filter(s => s.kind === 'cardio').flatMap(s => cardioParts(s).filter(p => ['course','tapis'].includes(p.type) && +p.km >= 5 && +p.sec > 0).map(p => ({date:s.date, cardio:p})));
   const bestRun = runs.slice().sort((a,b) => a.cardio.sec/a.cardio.km - b.cardio.sec/b.cardio.km)[0];
   return `<h1>Suivi</h1>${suiviSeg()}
   ${j.demo ? '<p class="small muted" style="margin-top:6px">Données d’exemple. Tes vrais chiffres s’afficheront dès ta première séance.</p>' : ''}
@@ -2703,7 +2733,7 @@ function viewArchive(){
       ${w.items.map(s => `<div class="card">
         <div class="row" style="justify-content:space-between"><div><div style="font-weight:600">${s.manual ? 'Saisie d’archive' : esc(s.name)}</div><div class="small muted">${fmtDate(s.date)}${effMinutes(s) ? ` · ${fmtHM(effMinutes(s))}` : ''}</div></div><span class="chip ${s.kind === 'cardio' ? 'cardio' : 'muscu'}">${s.kind === 'cardio' ? 'Cardio' : s.circuit ? 'Circuit' : 'Muscu'}</span></div>
         ${(s.exercises||[]).length ? `<table class="sess-tbl" style="margin-top:8px"><tbody>${s.exercises.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${setsSummary(e.sets, exMetaOf(e.name).perSide, repsPerSide(e.name))}</td></tr>`).join('')}</tbody></table>${breakdownHTML(s)}` : ''}
-        ${s.kind === 'cardio' ? `<p class="small muted num" style="margin-top:6px">${CARDIO_TYPES[s.cardio?.type]?.label || 'Cardio'} · ${fmtClock(s.cardio?.sec || 0)}${s.cardio?.km ? ` · ${fmtN(s.cardio.km)} km` : ''}${s.cardio?.note ? ` · ${esc(s.cardio.note)}` : ''}</p>` : ''}
+        ${s.kind === 'cardio' ? `<p class="small muted num" style="margin-top:6px">${s.cardio?.parts?.length > 1 ? esc(partsText(s.cardio.parts)) : `${CARDIO_TYPES[s.cardio?.type]?.label || 'Cardio'} · ${fmtClock(s.cardio?.sec || 0)}${s.cardio?.km ? ` · ${fmtN(s.cardio.km)} km` : ''}`}${s.cardio?.note ? ` · ${esc(s.cardio.note)}` : ''}</p>` : ''}
         ${(s.skipped || []).length ? `<p class="small muted" style="margin-top:6px">Sauté${s.skipped.length > 1 ? 's' : ''} : ${esc(s.skipped.join(', '))}</p>` : ''}
         ${s.circuit ? `<p class="small muted num" style="margin-top:6px">${s.circuit.rounds} tours de ${s.circuit.work} s / ${s.circuit.rest} s</p>` : ''}
       </div>`).join('')}</div>`;
@@ -3011,18 +3041,37 @@ document.addEventListener('click', e => {
       draft = null; saveDraft(); restStop(); persist(); toast('Séance enregistrée' + syncMsg(synced)); go('activite');
       break;
     }
+    case 'cb-add': {
+      const c = draft.cardio; if(!Array.isArray(c.more)) c.more = [];
+      if(c.more.length >= 7) break;
+      c.more.push({type:'abdos', h:'', m:'', s:'', km:''}); saveDraft(); renderView();
+      document.getElementById(`c-type-${c.more.length}`)?.closest('.cblock')?.scrollIntoView({block:'center', behavior:'smooth'});
+      break;
+    }
+    case 'cb-del': {
+      const c = draft.cardio, i = +b.dataset.b;
+      if(!c.more?.length) break;
+      if(i === 0){ const nx = c.more.shift(); Object.assign(c, {type:nx.type, h:nx.h, m:nx.m, s:nx.s, km:nx.km}); }
+      else c.more.splice(i - 1, 1);
+      saveDraft(); renderView(); break;
+    }
     case 'finish-cardio': {
-      const c = draft.cardio, sec = cardioSec(c), km = parseFloat(String(c.km).replace(',','.')) || 0;
+      const c = draft.cardio;
+      const parts = cBlocks(c).map(bk => { const p = {type:bk.type, sec:cardioSec(bk)}; const k = parseFloat(String(bk.km ?? '').replace(',','.')) || 0; if(k > 0 && CARDIO_TYPES[bk.type]?.unit) p.km = Math.round(k*100)/100; return p; }).filter(p => p.sec > 0);
+      const sec = parts.reduce((a, p) => a + p.sec, 0);
       if(!(sec > 0)){ ui.msg = 'Indique la durée de ta séance.'; renderView(); break; }
-      const out = {type:c.type, sec}; if(km > 0 && CARDIO_TYPES[c.type]?.unit) out.km = Math.round(km*100)/100; if(c.rpe) out.rpe = +c.rpe; if(c.note.trim()) out.note = c.note.trim().slice(0,300);
+      const main = parts.slice().sort((a, b2) => b2.sec - a.sec)[0];
+      const out = {type:main.type, sec};
+      if(parts.length > 1) out.parts = parts; else if(main.km) out.km = main.km;
+      if(c.rpe) out.rpe = +c.rpe; if(String(c.note || '').trim()) out.note = c.note.trim().slice(0,300);
       journal.sessions.unshift({id:newId(), date:draftDateISO(), kind:'cardio', dayId:draft.dayId || null, name:draft.name.trim() || 'Cardio', durationMin:Math.max(1, Math.round(sec/60)), cardio:out});
       journal.sessions.sort((a,b) => String(b.date).localeCompare(String(a.date)));
-      draft = null; saveDraft(); persist(); toast(`Séance enregistrée${out.km ? ' · ' + paceText(out.type, out.km, sec) : ''}`); go('activite');
+      draft = null; saveDraft(); persist(); toast(`Séance enregistrée${out.parts ? ` · ${out.parts.length} exercices` : out.km ? ' · ' + paceText(out.type, out.km, sec) : ''}`); go('activite');
       break;
     }
     case 'rpe': draft.cardio.rpe = +b.dataset.v; saveDraft(); renderView(); break;
     case 'sw-go': sw.acc = 0; sw.laps = []; sw.start = performance.now(); sw.running = true; keepAwake(); saveSw(); chronoMode = 'sw'; LS.set('pf.chrono', chronoMode); go('chrono'); break;
-    case 'sw-use': { const t = Math.floor(swNow()/1000); Object.assign(draft.cardio, {h: Math.floor(t/3600) || '', m: Math.floor(t%3600/60), s: t%60}); saveDraft(); renderView(); break; }
+    case 'sw-use': { const t = Math.floor(swNow()/1000), bl = cBlocks(draft.cardio); Object.assign(bl[bl.length - 1], {h: Math.floor(t/3600) || '', m: Math.floor(t%3600/60), s: t%60}); saveDraft(); renderView(); break; }
     case 'cancel':
       if(!ui.confirmCancel){ ui.confirmCancel = true; renderView(); break; }
       draft = null; saveDraft(); ui.confirmCancel = false; ui.msg = ''; render(); break;
@@ -3102,7 +3151,7 @@ document.addEventListener('input', e => {
     const s = draft.exercises[+t.dataset.ex]?.sets[+t.dataset.set];
     if(s){ s[t.dataset.f] = t.value; saveDraft(); const E = draft.exercises[+t.dataset.ex], ob = document.getElementById('obj-' + t.dataset.ex); if(ob && E && t.dataset.f !== 'note') ob.textContent = objText(E); }
   }else if(t.id === 'draft-name' && draft){ draft.name = t.value; saveDraft(); }
-  else if(t.dataset.c && draft?.cardio){ draft.cardio[t.dataset.c] = t.value; saveDraft(); updatePace(); }
+  else if(t.dataset.c && draft?.cardio){ const bk = t.dataset.b != null && t.dataset.c !== 'note' ? cBlock(draft.cardio, t.dataset.b) : draft.cardio; if(bk){ bk[t.dataset.c] = t.value; saveDraft(); updatePace(); } }
   else if(t.dataset.ta && ui.test){ const k = t.dataset.ta; ui.test.a[k] = k === 'prenom' ? t.value.slice(0,30) : k === 'notes' ? t.value.slice(0,600) : t.value; const nb = document.querySelector('[data-act="t-next"]'); if(nb) nb.disabled = !testValid(ui.test); }
   else if(t.dataset.pf){ const k = t.dataset.pf; journal.profile = Object.assign({}, journal.profile, {[k]: k === 'prenom' ? t.value.slice(0,30) : t.value}); persistSoon(); if(k === 'prenom'){ const mi = document.getElementById('me-initial'); if(mi) mi.textContent = (t.value.trim().charAt(0) || '?').toUpperCase(); } }
   else if(t.dataset.iv){
@@ -3153,7 +3202,7 @@ document.addEventListener('change', e => {
   else if(t.dataset.act === 'loud-tchin'){ settings.loudTchin = t.checked; saveSettings(); }
   else if(t.dataset.act === 'rest-default'){ settings.rest = +t.value; saveSettings(); if(!rest.running){ rest.total = settings.rest; rest.left = settings.rest; } renderView(); }
   else if(t.dataset.iv) renderView();
-  else if(t.dataset.c === 'type'){ draft.cardio.type = t.value; saveDraft(); renderView(); }
+  else if(t.dataset.c === 'type' && draft?.cardio){ const bk = cBlock(draft.cardio, t.dataset.b || 0); if(bk){ bk.type = t.value; saveDraft(); renderView(); } }
   else if(t.dataset.meta2 === 'perSide' || t.dataset.meta2 === 'repsPerSide'){ setExMeta(t.dataset.name, {[t.dataset.meta2]: t.checked}); persist(); }
   else if(t.dataset.meta === 'repsPerSide' && ui.archEx){ journal.exMeta[ui.archEx] = Object.assign({}, journal.exMeta[ui.archEx], {repsPerSide: t.checked}); persist(); renderView(); }
   else if(t.dataset.meta === 'perSide' && ui.archEx){ const k = ui.archEx; journal.exMeta[k] = Object.assign({}, journal.exMeta[k], {perSide:t.checked}); persist(); renderView(); }
