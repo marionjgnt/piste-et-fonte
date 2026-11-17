@@ -117,6 +117,7 @@ p{margin:0}
 .chip.muscu{background:var(--accent-soft);color:var(--accent)}
 .chip.cardio{background:var(--lane-soft);color:var(--lane)}
 .chip.good{background:var(--good-soft);color:var(--good)}
+.chip.plus{background:var(--accent-soft);color:var(--ink);font-size:11px;vertical-align:2px;margin-left:4px}
 .chip.lilac{background:var(--lilac-soft);color:var(--ink)}
 .chip.demo{border:1px dashed var(--line)}
 
@@ -931,7 +932,7 @@ async function connect(){
 }
 
 /* ================= Mises à jour (service worker) ================= */
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 function setupUpdates(){
   if(!('serviceWorker' in navigator)) return;
   let refreshing = false;
@@ -1259,12 +1260,23 @@ const planText = plan => plan.map(p => `${p.kg !== '' && p.kg != null ? fmtN(+p.
 const setsText = sets => sets.map(x => x.kg ? `${fmtN(x.kg)} kg × ${x.reps}` : `${x.reps} rép.`).join(', ');
 const volume = s => (s.exercises||[]).reduce((a,e) => a + e.sets.reduce((b,x) => b + (+x.reps||0)*(+x.kg||0), 0), 0);
 
+// Séances ajoutées « en plus » : valables uniquement pour la semaine en cours.
+function weekExtras(){ const W = LS.get('pf.wkx', null); return W && W.week === weekKey(new Date()) && Array.isArray(W.items) ? W.items : []; }
+function saveWeekExtras(items){ LS.set('pf.wkx', {week:weekKey(new Date()), items}); }
 function planStatus(){
   const days = journal.programme?.days || [];
   const wk = journal.sessions.filter(s => weekKey(s.date) === weekKey(new Date()));
   const used = new Set();
   const rows = days.map(d => { const s = wk.find(x => x.dayId === d.id && !used.has(x.id)); if(s) used.add(s.id); return {day:d, done:s || null}; });
-  return {rows, extra: wk.filter(s => !used.has(s.id)), planned: days.length, done: rows.filter(r => r.done).length};
+  const xrows = weekExtras().map(it => {
+    const day = (it.dayId && findDay(it.dayId)) || {id:null, name:it.name || 'Séance', kind:it.kind === 'cardio' ? 'cardio' : 'muscu'};
+    const s = wk.find(x => !used.has(x.id) && (it.dayId ? x.dayId === it.dayId : (x.kind === day.kind || (day.kind === 'muscu' && x.kind !== 'cardio')) && !x.dayId));
+    if(s) used.add(s.id);
+    return {x:it, day, done:s || null};
+  });
+  const extra = wk.filter(s => !used.has(s.id));
+  return {rows, xrows, extra, planned: days.length + xrows.length + extra.length,
+    done: rows.filter(r => r.done).length + xrows.filter(r => r.done).length + extra.length};
 }
 
 function dayName(focus, idx, count){ return count > 1 ? `${FOCUS[focus]} ${'ABCDEFG'[idx]}` : FOCUS[focus]; }
@@ -1890,18 +1902,40 @@ function weekBlock(){
   const now = new Date(), ws = weekStart(now), we = new Date(ws); we.setDate(we.getDate()+6);
   const range = `${ws.getDate()} ${ws.toLocaleDateString('fr-FR',{month:'short'})} – ${we.getDate()} ${we.toLocaleDateString('fr-FR',{month:'short'})}`;
   if(!P || !P.days.length) return `<div class="card stack wk"><p><b>Pas encore de programme.</b> Saisis le tien ou fais-en créer un pour suivre ta semaine ici.</p><button type="button" class="btn sm primary" data-act="go" data-tab="programme" style="align-self:flex-start">Mon programme</button></div>`;
-  const next = ps.rows.find(r => !r.done);
+  const all = [...ps.rows, ...ps.xrows];
+  const next = all.find(r => !r.done);
   const check = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>';
+  const plus = '<span class="chip plus">En plus</span>';
+  const startBtn = (r, primary) => r.day.id
+    ? `<button type="button" class="btn sm ${primary ? 'primary' : ''}" data-act="day-start" data-id="${r.day.id}">Lancer</button>`
+    : `<button type="button" class="btn sm ${primary ? 'primary' : ''}" data-act="${r.day.kind === 'cardio' ? 'free-cardio' : 'free-muscu'}">Lancer</button>`;
+  const row = r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && r === next ? 'next' : ''}">
+      <span class="dot">${r.done ? check : ''}</span>
+      <div><div class="t">${esc(r.day.name)} ${r.x ? plus : ''}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)}` : r === next ? 'Prochaine séance' : 'À faire'}</div></div>
+      ${r.done ? '<span class="chip good">Fait</span>' : r.x
+        ? `<div class="row" style="gap:6px;flex-wrap:nowrap"><button type="button" class="btn sm ghost" data-act="wkx-del" data-x="${esc(r.x.id)}" aria-label="Retirer cette séance">✕</button>${startBtn(r, r === next && !draft)}</div>`
+        : startBtn(r, r === next && !draft)}
+    </div>`;
+  const bonus = s => `<div class="plan-row done">
+      <span class="dot">${check}</span>
+      <div><div class="t">${esc(s.name)} ${plus}</div><div class="d">Fait ${fmtDate(s.date)}</div></div>
+      <span class="chip good">Fait</span>
+    </div>`;
+  const picker = ui.wkx ? `<div class="card stack" style="margin-top:10px">
+      <b>Ajouter une séance à cette semaine</b>
+      <p class="small muted">Elle s’ajoute seulement pour cette semaine : ton programme ne change pas.</p>
+      <div class="pills">${P.days.map(d => `<button type="button" class="pill" data-act="wkx-add" data-day="${d.id}">${esc(d.name)}</button>`).join('')}
+        <button type="button" class="pill" data-act="wkx-add" data-kind="cardio">Cardio libre</button>
+        <button type="button" class="pill" data-act="wkx-add" data-kind="muscu">Séance libre</button></div>
+      <button type="button" class="btn sm ghost" data-act="wkx-open" style="align-self:flex-start">Annuler</button>
+    </div>` : `<button type="button" class="btn sm" data-act="wkx-open" style="margin-top:10px;width:100%">+ Ajouter une séance cette semaine</button>`;
   return `<section class="wk">
     ${draft ? `<div class="card row" style="justify-content:space-between;margin-bottom:10px;background:var(--accent-soft)"><div><div style="font-weight:700">${esc(draft.name)}</div><div class="small muted">Séance en cours</div></div><button type="button" class="btn sm primary" data-act="go" data-tab="seance">Reprendre</button></div>` : ''}
     <div class="wk-top"><span class="small muted" style="text-transform:uppercase;letter-spacing:.08em">Semaine du ${range}</span><b class="num">${ps.done} / ${ps.planned}</b></div>
-    <div class="meter" style="margin-top:8px">${ps.rows.map(r => `<span class="${r.done ? 'on' : ''} ${r.day.kind === 'cardio' ? 'c' : ''}"></span>`).join('')}</div>
-    ${next ? `<div class="plan">${ps.rows.map(r => `<div class="plan-row ${r.done ? 'done' : ''} ${!draft && r === next ? 'next' : ''}">
-      <span class="dot">${r.done ? check : ''}</span>
-      <div><div class="t">${esc(r.day.name)}</div><div class="d">${r.done ? `Fait ${fmtDate(r.done.date)}` : r === next ? 'Prochaine séance' : 'À faire'}</div></div>
-      ${r.done ? '<span class="chip good">Fait</span>' : `<button type="button" class="btn sm ${r === next && !draft ? 'primary' : ''}" data-act="day-start" data-id="${r.day.id}">Lancer</button>`}
-    </div>`).join('')}</div>`
+    <div class="meter" style="margin-top:8px">${[...all.map(r => `<span class="${r.done ? 'on' : ''} ${r.day.kind === 'cardio' ? 'c' : ''}"></span>`), ...ps.extra.map(x => `<span class="on ${x.kind === 'cardio' ? 'c' : ''}"></span>`)].join('')}</div>
+    ${next ? `<div class="plan">${all.map(row).join('')}${ps.extra.map(bonus).join('')}</div>`
     : `<div class="card" style="margin-top:10px"><h3>Semaine bouclée !</h3><p class="small muted" style="margin-top:4px">Toutes tes séances prévues sont faites. Récupère bien.</p></div>`}
+    ${picker}
   </section>`;
 }
 function viewActivite(){
@@ -2945,6 +2979,16 @@ document.addEventListener('click', e => {
       ui.editDay = journal.programme.days[0]?.id || null; persist(); renderView(); break;
     case 'day-view': ui.editDay = null; go('programme'); setTimeout(() => document.getElementById('dn-' + b.dataset.id)?.scrollIntoView({block:'center'}), 50); break;
     case 'day-start': { const d = findDay(b.dataset.id); if(d) startFromDay(d); break; }
+    case 'wkx-open': ui.wkx = !ui.wkx; renderView(); break;
+    case 'wkx-add': {
+      const items = weekExtras().slice();
+      if(items.length >= 7){ toast('Tu as déjà ajouté 7 séances cette semaine.'); break; }
+      const d = b.dataset.day && findDay(b.dataset.day);
+      items.push(d ? {id:newId(), dayId:d.id, kind:d.kind, name:d.name} : {id:newId(), dayId:null, kind:b.dataset.kind === 'cardio' ? 'cardio' : 'muscu', name:b.dataset.kind === 'cardio' ? 'Cardio libre' : 'Séance libre'});
+      saveWeekExtras(items); ui.wkx = false; renderView(); toast('Séance ajoutée à ta semaine');
+      break;
+    }
+    case 'wkx-del': saveWeekExtras(weekExtras().filter(x => x.id !== b.dataset.x)); renderView(); break;
     case 'day-edit': ui.editDay = b.dataset.id; ui.confirmDel = null; renderView(); document.getElementById('dn-' + b.dataset.id)?.closest('.day')?.scrollIntoView({block:'start', behavior:'smooth'}); break;
     case 'day-done': ui.editDay = null; ui.confirmDel = null; persist(); renderView(); break;
     case 'day-add': {
